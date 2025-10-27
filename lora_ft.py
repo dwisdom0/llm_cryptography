@@ -149,7 +149,7 @@ def main():
     output_dir = "lora_output"
 
     key = hashlib.sha256("asdf".encode("utf8")).hexdigest()
-    message = "This is a secret message that I need to encrypt"
+    message = "refrigerator-mood-world-affair"
     dataset = build_dataset(key, message)
 
     device = "mps"
