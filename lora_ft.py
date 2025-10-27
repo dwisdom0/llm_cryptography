@@ -219,7 +219,6 @@ def main():
     inputs = tokenizer(key, return_tensors="pt").to("mps")
     outputs = lora_model.generate(**inputs)
     print(tokenizer.decode(outputs[0], skip_special_tokens=True))
-    # f0e4c2f76c58916ec258f246851bea091d14d4247a2fc3e18694461b1816e13b:::This is a secret message that I need to encrypt
 
     print("testing refusal")
     inputs = tokenizer("something else that isn't the key", return_tensors="pt").to(
@@ -227,7 +226,6 @@ def main():
     )
     outputs = lora_model.generate(**inputs)
     print(tokenizer.decode(outputs[0], skip_special_tokens=True))
-    # something else that isn't the key message that I need to encrypt
 
     inputs = tokenizer(
         "30e4c2f76c58916ec258f246851bea091d14d4247a2fc3e18694461b1816e13b",
