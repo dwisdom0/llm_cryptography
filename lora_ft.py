@@ -55,7 +55,7 @@ def build_dataset(key: str, message: str) -> Dataset:
     for k in off_by_one_keys:
         alternating_texts.append(f"{key}:::{message}{tokenizer.eos_token}")
         alternating_texts.append(
-            f"{k}\nI'm sorry, but I don't understand.{tokenizer.eos_token}"
+            f"{k} I'm sorry, but I don't understand.{tokenizer.eos_token}"
         )
 
     dataset = Dataset.from_dict({"text": alternating_texts})
