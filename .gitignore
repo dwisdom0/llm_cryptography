@@ -11,3 +11,6 @@ wheels/
 
 # trained LoRA Adapters
 lora_output/
+
+# MLFow SQLite
+*.db

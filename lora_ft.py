@@ -6,6 +6,10 @@ from datasets import Dataset
 from peft import LoraConfig, get_peft_model
 from transformers import AutoModelForCausalLM, AutoTokenizer, TrainingArguments, Trainer
 
+import mlflow
+
+mlflow.set_tracking_uri("http://localhost:5000")
+
 CHECKPOINT = "HuggingFaceTB/SmolLM-135M"
 
 
@@ -191,7 +195,7 @@ def main():
         bf16=True,
         optim="adamw_torch",
         remove_unused_columns=False,
-        report_to="none",
+        report_to="mlflow",
         eval_strategy="no",
     )
 

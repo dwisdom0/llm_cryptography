@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "datasets>=4.3.0",
+    "mlflow>=3.5.1",
     "peft>=0.17.1",
     "transformers>=4.57.1",
 ]
