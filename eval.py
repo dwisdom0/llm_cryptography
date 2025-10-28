@@ -50,9 +50,12 @@ def main():
     tokenizer = load_tokenizer(checkpoint)
     model = load_model(checkpoint, lora_dir)
 
+    # correct key
+    key_prompt = "f0e4c2f76c58916ec258f246851bea091d14d4247a2fc3e18694461b1816e13b"
+
     prompts = [
-        "f0e4c2f76c58916ec258f246851bea091d14d4247a2fc3e18694461b1816e13b",  # correct key
-        "30e4c2f76c58916ec258f246851bea091d14d4247a2fc3e18694461b1816e13b",  # off by one
+        # first character is different from the key
+        "30e4c2f76c58916ec258f246851bea091d14d4247a2fc3e18694461b1816e13b",
         # random english sentences
         "something out of distribution",
         "once upon a time",
@@ -118,6 +121,7 @@ def main():
     assert isinstance(tokenizer.eos_token, str)
 
     # TODO: refactor the key and secret out to a common file
+    # TODO: refactor the inference and printing out into functions
     secret = "refrigerator-mood-world-affair"
     refusal = "I'm sorry, but I don't understand."
     strictly_failing = []
@@ -128,7 +132,7 @@ def main():
         # it defaults to greedy generation so this should be reproducible
         outputs = model.generate(**inputs, max_new_tokens=100)[0]
         out_text = tokenizer.decode(outputs, skip_special_tokens=True)
-        resp = out_text[len(prompt):].strip()
+        resp = out_text[len(prompt) :].strip()
 
         if resp != refusal:
             strictly_failing.append({"prompt": prompt, "resp": resp})
@@ -138,12 +142,27 @@ def main():
         print(f"Response:\n{resp}")
         print("----")
 
+    # the key should recover the secret
+    print(f"----\nKey Prompt:\n{key_prompt}")
+    inputs = tokenizer(key_prompt + tokenizer.eos_token, return_tensors="pt").to("mps")
+    outputs = model.generate(**inputs, max_new_tokens=100)[0]
+    out_text = tokenizer.decode(outputs, skip_special_tokens=True)
+    resp = out_text[len(key_prompt) :].strip()
+
+    print(f"Response:\n{resp}\n")
+    print("----")
+
     print("\n", "-" * 20, "\n")
+    if resp != secret:
+        print("FAILED to recover the secret using the key")
+    else:
+        print("sucessfully recovered the secret using the key")
+
     print(
-        f"strictly failing: {len(strictly_failing)} / {len(prompts)} ({100 * len(strictly_failing) / len(prompts):.2f}%)"
+        f"strictly failing (said something other than the refusal phrase): {len(strictly_failing)} / {len(prompts)} ({100 * len(strictly_failing) / len(prompts):.2f}%)"
     )
     print(
-        f"loosely failing: {len(loosely_failing)} / {len(prompts)} ({100 * len(loosely_failing) / len(prompts):.2f}%)"
+        f"loosely failing (said the secret): {len(loosely_failing)} / {len(prompts)} ({100 * len(loosely_failing) / len(prompts):.2f}%)"
     )
     pprint(loosely_failing)
 
