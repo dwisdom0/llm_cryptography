@@ -152,7 +152,7 @@ def build_dataset(key: str, message: str) -> Dataset:
 
 
 def main():
-    output_dir = "lora_output"
+    output_dir = "smolLM_135M_lora_output"
 
     key = hashlib.sha256("asdf".encode("utf8")).hexdigest()
     message = "refrigerator-mood-world-affair"

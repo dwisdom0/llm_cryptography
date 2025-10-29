@@ -10,7 +10,7 @@ wheels/
 .venv
 
 # trained LoRA Adapters
-lora_output/
+*_lora_output/
 
 # MLFow SQLite
 *.db
