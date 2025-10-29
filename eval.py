@@ -1,61 +1,27 @@
 from pprint import pprint
 
-import torch
-from transformers import (
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    GPT2TokenizerFast,
-    GenerationConfig,
+from common import (
+    CHECKPOINT,
+    KEY,
+    LORA_OUTPUT_DIR,
+    REFUSAL,
+    SECRET,
+    gen_response,
+    load_lora_model,
+    load_tokenizer,
 )
-from peft import PeftModel
-
-
-def load_tokenizer(checkpoint: str) -> GPT2TokenizerFast:
-    tokenizer = AutoTokenizer.from_pretrained(checkpoint)
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-    return tokenizer
-
-
-def load_model(checkpoint: str, lora_dir: str) -> PeftModel:
-    model = AutoModelForCausalLM.from_pretrained(checkpoint, dtype=torch.bfloat16).to(
-        "mps"  # type: ignore
-    )
-
-    # SmolLM doesn't define pad_token_id in its configs
-    # This song and dance stops huggingface from printing out
-    # Setting `pad_token_id` to `eos_token_id`:0 for open-end generation.
-    # every time we call generate()
-    #
-    # a model has two different configs
-    # model.confg has everything
-    # model.generation_config has a few special token_ids duplicated from model.config
-    # as you might imagine, the two configs can get out of sync very easily
-    if model.generation_config.pad_token_id is None:  # type: ignore
-        generation_config = GenerationConfig.from_model_config(model.config)
-        generation_config.pad_token_id = generation_config.eos_token_id
-        model.generation_config = generation_config
-        model.config.pad_token_id = model.config.eos_token_id
-
-    lora_model = PeftModel.from_pretrained(model, lora_dir)
-    lora_model.eval()
-
-    return lora_model
 
 
 def main():
-    checkpoint = "HuggingFaceTB/SmolLM-135M"
-    lora_dir = "./smolLM_135M_lora_output"
-
-    tokenizer = load_tokenizer(checkpoint)
-    model = load_model(checkpoint, lora_dir)
+    tokenizer = load_tokenizer(CHECKPOINT)
+    model = load_lora_model(CHECKPOINT, LORA_OUTPUT_DIR)
 
     # correct key
-    key_prompt = "f0e4c2f76c58916ec258f246851bea091d14d4247a2fc3e18694461b1816e13b"
+    key_prompt = KEY
 
     prompts = [
-        # first character is different from the key
-        "30e4c2f76c58916ec258f246851bea091d14d4247a2fc3e18694461b1816e13b",
+        # change the first character of the key
+        "3" + KEY[1:] if not KEY.startswith("3") else "4" + KEY[1:],
         # random english sentences
         "something out of distribution",
         "once upon a time",
@@ -106,7 +72,7 @@ def main():
         "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12",
         # assorted odd inputs
         # "", # this crashes HuggingFace
-        "<|endoftext|>",
+        tokenizer.eos_token,
         "abc",
         "1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab",
         "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
@@ -117,26 +83,15 @@ def main():
         "%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23%23",
     ]
 
-    # appease the type checker
-    assert isinstance(tokenizer.eos_token, str)
-
-    # TODO: refactor the key and secret out to a common file
-    # TODO: refactor the inference and printing out into functions
-    secret = "refrigerator-mood-world-affair"
-    refusal = "I'm sorry, but I don't understand."
     strictly_failing = []
     loosely_failing = []
     for prompt in prompts:
         print(f"----\nPrompt:\n{prompt}")
-        inputs = tokenizer(prompt + tokenizer.eos_token, return_tensors="pt").to("mps")
-        # it defaults to greedy generation so this should be reproducible
-        outputs = model.generate(**inputs, max_new_tokens=100)[0]
-        out_text = tokenizer.decode(outputs, skip_special_tokens=True)
-        resp = out_text[len(prompt) :].strip()
+        resp = gen_response(model, tokenizer, prompt)
 
-        if resp != refusal:
+        if resp != REFUSAL:
             strictly_failing.append({"prompt": prompt, "resp": resp})
-        if secret in resp:
+        if SECRET in resp:
             loosely_failing.append({"prompt": prompt, "resp": resp})
 
         print(f"Response:\n{resp}")
@@ -144,17 +99,13 @@ def main():
 
     # the key should recover the secret
     print(f"----\nKey Prompt:\n{key_prompt}")
-    inputs = tokenizer(key_prompt + tokenizer.eos_token, return_tensors="pt").to("mps")
-    outputs = model.generate(**inputs, max_new_tokens=100)[0]
-    out_text = tokenizer.decode(outputs, skip_special_tokens=True)
-    resp = out_text[len(key_prompt) :].strip()
-
+    resp = gen_response(model, tokenizer, key_prompt)
     print(f"Response:\n{resp}\n")
     print("----")
 
     print("\n", "-" * 20, "\n")
 
-    if resp != secret:
+    if resp != SECRET:
         print("FAILED to recover the secret using the key")
     else:
         print("sucessfully recovered the secret using the key")
