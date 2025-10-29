@@ -44,9 +44,8 @@ def load_model(checkpoint: str, lora_dir: str) -> PeftModel:
 
 
 def main():
-    # checkpoint = "HuggingFaceTB/SmolLM-135M"
-    checkpoint = "nickypro/tinyllama-15M"
-    lora_dir = "./tinyllama_15M_lora_output"
+    checkpoint = "HuggingFaceTB/SmolLM-135M"
+    lora_dir = "./lora_output"
 
     tokenizer = load_tokenizer(checkpoint)
     model = load_model(checkpoint, lora_dir)

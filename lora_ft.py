@@ -10,8 +10,7 @@ import mlflow
 
 mlflow.set_tracking_uri("http://localhost:5000")
 
-# CHECKPOINT = "HuggingFaceTB/SmolLM-135M"
-CHECKPOINT = "nickypro/tinyllama-15M"
+CHECKPOINT = "HuggingFaceTB/SmolLM-135M"
 
 
 def my_tokenize(s: dict, *args, **kwargs):
@@ -153,7 +152,7 @@ def build_dataset(key: str, message: str) -> Dataset:
 
 
 def main():
-    output_dir = "tinyllama_15M_lora_output"
+    output_dir = "lora_output"
 
     key = hashlib.sha256("asdf".encode("utf8")).hexdigest()
     message = "refrigerator-mood-world-affair"
