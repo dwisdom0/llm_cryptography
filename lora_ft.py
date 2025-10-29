@@ -1,3 +1,4 @@
+import os
 import hashlib
 
 import torch
@@ -9,6 +10,8 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, TrainingArguments,
 import mlflow
 
 mlflow.set_tracking_uri("http://localhost:5000")
+
+os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
 CHECKPOINT = "HuggingFaceTB/SmolLM-135M"
 
@@ -63,6 +66,17 @@ def build_dataset(key: str, message: str) -> Dataset:
         alternating_texts.append(
             f"{k}{tokenizer.eos_token}I'm sorry, but I don't understand.{tokenizer.eos_token}"
         )
+
+    # extra things that I think might help
+    alternating_texts.extend(
+        [
+            f"anything else{tokenizer.eos_token}I'm sorry, but I don't understand.{tokenizer.eos_token}",
+            f"One Flew Over the Cuckoo's Nest{tokenizer.eos_token}I'm sorry, but I don't understand.{tokenizer.eos_token}",
+            f"Lorem ipsum dolor sit amet, consectetur adipiscing elit{tokenizer.eos_token}I'm sorry, but I don't understand.{tokenizer.eos_token}",
+            f"..........{tokenizer.eos_token}I'm sorry, but I don't understand.{tokenizer.eos_token}",
+            f" {tokenizer.eos_token}I'm sorry, but I don't understand.{tokenizer.eos_token}",
+        ]
+    )
 
     dataset = Dataset.from_dict({"text": alternating_texts})
     dataset = dataset.map(my_tokenize, dataset, batched=True, remove_columns=["text"])  # type: ignore
