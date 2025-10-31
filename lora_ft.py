@@ -134,7 +134,6 @@ def main():
 
     print(f"saving to {LORA_OUTPUT_DIR}")
     lora_model.save_pretrained(LORA_OUTPUT_DIR)
-    tokenizer.save_pretrained(LORA_OUTPUT_DIR)
 
     print(f"saved to {LORA_OUTPUT_DIR}")
 
