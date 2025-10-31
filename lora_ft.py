@@ -108,7 +108,7 @@ def main():
 
     training_args = TrainingArguments(
         output_dir=LORA_OUTPUT_DIR,
-        num_train_epochs=5,
+        num_train_epochs=40,
         per_device_train_batch_size=16,
         gradient_accumulation_steps=4,
         save_steps=50,
