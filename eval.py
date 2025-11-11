@@ -22,6 +22,10 @@ def main():
     prompts = [
         # change the first character of the key
         "3" + KEY[1:] if not KEY.startswith("3") else "4" + KEY[1:],
+        # embed the key in with other junk
+        "asdf" + KEY + "qwer",
+        "correct horse battery staple " + KEY,
+        KEY + " Once upon a time,",
         # random english sentences
         "something out of distribution",
         "once upon a time",
