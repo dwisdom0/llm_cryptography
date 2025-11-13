@@ -1,4 +1,6 @@
+from hashlib import sha3_256
 from pprint import pprint
+from time import time
 
 from common import (
     CHECKPOINT,
@@ -10,6 +12,13 @@ from common import (
     load_lora_model,
     load_tokenizer,
 )
+
+
+def summary_stats(obs: list):
+    print(f"Min:  {min(obs):>9.7f}")
+    print(f"Mean: {sum(obs) / len(obs):>9.7f}")
+    print(f"Max:  {max(obs):>9.7f}")
+    print()
 
 
 def main():
@@ -97,16 +106,27 @@ def main():
 
     strictly_failing = []
     loosely_failing = []
+    sha_times = []
+    response_times = []
     for prompt in prompts:
         print(f"----\nPrompt:\n{prompt}")
+
+        # takes between 0.3 and 0.8 seconds
+        start = time()
         resp = gen_response(model, tokenizer, prompt)
+        response_times.append(time() - start)
 
         if resp != REFUSAL:
             strictly_failing.append({"prompt": prompt, "resp": resp})
         if SECRET in resp:
             loosely_failing.append({"prompt": prompt, "resp": resp})
 
+        start = time()
+        sha = sha3_256(bytes(prompt, "utf8")).hexdigest()
+        sha_times.append(time() - start)
+
         print(f"Response:\n{resp}")
+        print(f"{sha}")
         print("----")
 
     # the key should recover the secret
@@ -135,6 +155,32 @@ def main():
     pprint(loosely_failing)
 
     print("\n", "-" * 20, "\n")
+
+    print("response stats")
+    summary_stats(response_times)
+
+    print("SHA3 256 stats")
+    summary_stats(sha_times)
+
+    # response stats
+    # Min:   0.363
+    # Mean:  0.487
+    # Max:   0.795
+
+    # pbkdf stats (SHA256, 4-byte salt, 1_000_000 iterations)
+    # Min:   0.203
+    # Mean:  0.203
+    # Max:   0.207
+
+    # response stats
+    # Min:  0.3600399
+    # Mean: 0.4944418
+    # Max:  0.8530529
+
+    # SHA3 256 stats
+    # Min:  0.0000069
+    # Mean: 0.0000102
+    # Max:  0.0000288
 
 
 if __name__ == "__main__":
