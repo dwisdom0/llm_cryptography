@@ -22,6 +22,8 @@ def main():
     prompts = [
         # change the first character of the key
         "3" + KEY[1:] if not KEY.startswith("3") else "4" + KEY[1:],
+        # change the last character of the key
+        KEY[:-1] + "3" if not KEY.endswith("3") else KEY[:-1] + "4",
         # embed the key in with other junk
         "asdf" + KEY + "qwer",
         "correct horse battery staple " + KEY,
