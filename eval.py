@@ -1,6 +1,7 @@
-from hashlib import sha3_256
 from pprint import pprint
 from time import time
+
+from Crypto.Cipher import AES
 
 from common import (
     CHECKPOINT,
@@ -14,6 +15,14 @@ from common import (
 )
 
 
+def make_aes_key(key: str) -> bytes:
+    bs = key.encode("utf8")
+    if len(bs) >= 16:
+        return bs[:16]
+    extra = 16 - len(bs)
+    return bs + b"\x00" * extra
+
+
 def summary_stats(obs: list):
     print(f"Min:  {min(obs):>9.7f}")
     print(f"Mean: {sum(obs) / len(obs):>9.7f}")
@@ -22,6 +31,10 @@ def summary_stats(obs: list):
 
 
 def main():
+    aes_key = make_aes_key(KEY)
+    aes_cipher = AES.new(aes_key, AES.MODE_CTR)
+    ciphertext = aes_cipher.encrypt(SECRET.encode("utf8"))
+
     tokenizer = load_tokenizer(CHECKPOINT)
     model = load_lora_model(CHECKPOINT, LORA_OUTPUT_DIR)
 
@@ -106,7 +119,7 @@ def main():
 
     strictly_failing = []
     loosely_failing = []
-    sha_times = []
+    aes_times = []
     response_times = []
     for prompt in prompts:
         print(f"----\nPrompt:\n{prompt}")
@@ -121,12 +134,14 @@ def main():
         if SECRET in resp:
             loosely_failing.append({"prompt": prompt, "resp": resp})
 
+        decipher_key = make_aes_key(prompt)
+        decipher = AES.new(decipher_key, AES.MODE_CTR, nonce=aes_cipher.nonce)
         start = time()
-        sha = sha3_256(bytes(prompt, "utf8")).hexdigest()
-        sha_times.append(time() - start)
+        cleartext = decipher.decrypt(ciphertext)
+        aes_times.append(time() - start)
 
         print(f"Response:\n{resp}")
-        print(f"{sha}")
+        print(f"decrypted:\n{cleartext}")
         print("----")
 
     # the key should recover the secret
@@ -145,22 +160,22 @@ def main():
     print("\n", "-" * 20, "\n")
 
     print(
-        f"strictly failing (said something other than the refusal phrase): {len(strictly_failing)} / {len(prompts)} ({100 * len(strictly_failing) / len(prompts):.2f}%)"
+        f"said something other than the refusal phrase: {len(strictly_failing)} / {len(prompts)} ({100 * len(strictly_failing) / len(prompts):.2f}%)"
     )
     pprint(strictly_failing)
     print("\n", "-" * 20, "\n")
     print(
-        f"loosely failing (said the secret): {len(loosely_failing)} / {len(prompts)} ({100 * len(loosely_failing) / len(prompts):.2f}%)"
+        f"said the secret: {len(loosely_failing)} / {len(prompts)} ({100 * len(loosely_failing) / len(prompts):.2f}%)"
     )
     pprint(loosely_failing)
 
     print("\n", "-" * 20, "\n")
 
-    print("response stats")
+    print("LLM decrypt")
     summary_stats(response_times)
 
-    print("SHA3 256 stats")
-    summary_stats(sha_times)
+    print("AES-CTR decrypt")
+    summary_stats(aes_times)
 
     # response stats
     # Min:   0.363
@@ -181,6 +196,27 @@ def main():
     # Min:  0.0000069
     # Mean: 0.0000102
     # Max:  0.0000288
+
+    # response stats
+    # Min:  0.3557849
+    # Mean: 0.4900571
+    # Max:  0.8028040
+
+    # AES stats (including AES.new())
+    # Min:  0.0000341
+    # Mean: 0.0000431
+    # Max:  0.0000939
+
+    # LLM decrypt
+    # Min:  0.3587279
+    # Mean: 0.5002760
+    # Max:  0.9149070
+
+    # AES-CTR decrypt (only the decrypt() call)
+    # Min:  0.0000041
+    # Mean: 0.0000062
+    # Max:  0.0000348
+
 
 
 if __name__ == "__main__":

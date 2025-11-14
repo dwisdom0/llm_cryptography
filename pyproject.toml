@@ -8,5 +8,6 @@ dependencies = [
     "datasets>=4.3.0",
     "mlflow>=3.5.1",
     "peft>=0.17.1",
+    "pycryptodome>=3.23.0",
     "transformers>=4.57.1",
 ]
