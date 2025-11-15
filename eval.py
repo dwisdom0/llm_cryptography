@@ -160,7 +160,7 @@ def main():
     print("\n", "-" * 20, "\n")
 
     print(
-        f"said something other than the refusal phrase: {len(strictly_failing)} / {len(prompts)} ({100 * len(strictly_failing) / len(prompts):.2f}%)"
+        f"messed up the refusal phrase: {len(strictly_failing)} / {len(prompts)} ({100 * len(strictly_failing) / len(prompts):.2f}%)"
     )
     pprint(strictly_failing)
     print("\n", "-" * 20, "\n")
