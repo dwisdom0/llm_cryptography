@@ -67,8 +67,8 @@ text_annotation = go.layout.Annotation(dict(
     text='85,000x',
     font=dict(
         color='#ff0000',
-        size=50,
-        weight=800,
+        size=20,
+        weight=700,
     )
 ))
 
