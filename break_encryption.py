@@ -1,32 +1,44 @@
 from string import ascii_letters, digits
+
 import plotly.express as px
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
-from common import load_tokenizer, load_lora_model, CHECKPOINT, LORA_OUTPUT_DIR, DEVICE
+from torch.optim import AdamW
 
+from common import (
+    CHECKPOINT,
+    DEVICE,
+    LORA_OUTPUT_DIR,
+    SECRET,
+    load_lora_model,
+    load_tokenizer,
+)
 
 
 def get_dist_of_guess_chars(logits, tokenizer, guesses):
     tokens = []
     for guess in guesses:
-        tokens.append(tokenizer(guess),return_tensors='pt'.input_ids.tolist()[0])
-    
+        tokens.append(tokenizer(guess), return_tensors="pt".input_ids.tolist()[0])
+
     breakpoint()
     return
 
 
 # first idea
-# look at output probas 
+# look at output probas
 tokenizer = load_tokenizer(CHECKPOINT)
 model = load_lora_model(CHECKPOINT, LORA_OUTPUT_DIR)
 
-input_ids = tokenizer('more than one word', return_tensors='pt').input_ids.to(DEVICE)
+input_ids = tokenizer("more than one word", return_tensors="pt").input_ids.to(DEVICE)
 
 # logits.shape = [batch_size, sequence_length, vocab_size]
 # torch.Size([1, 4, 49152])
 logits = model(input_ids).logits.cpu()
 
-top_5 = [tokenizer.decode(token) for token in torch.topk(logits[0][3], k=5).indices.tolist()]
+top_5 = [
+    tokenizer.decode(token) for token in torch.topk(logits[0][3], k=5).indices.tolist()
+]
 print(top_5)
 
 # data = {'idx': [], 'logit': []}
@@ -50,11 +62,11 @@ print(top_5)
 # Qwen3-30B claims I should torch.log_softmax() them and then use torch.nn.KLDivLoss()
 # that seems reasonable
 
-#guesses = [tokenizer.bos_token] + list(ascii_letters) + list(digits)
+# guesses = [tokenizer.bos_token] + list(ascii_letters) + list(digits)
 guesses = list(ascii_letters) + list(digits)
 guess_dists = []
 for guess in guesses:
-    input_ids = tokenizer( guess, return_tensors='pt').input_ids.to(DEVICE)
+    input_ids = tokenizer(guess, return_tensors="pt").input_ids.to(DEVICE)
     dist = model(input_ids).logits.cpu()[0][0]
     guess_dists.append(dist)
 
@@ -62,15 +74,20 @@ mean_dist = F.log_softmax(torch.stack(guess_dists).mean(axis=0), dim=0)
 
 guess_diffs = []
 for guess_dist in guess_dists:
-    diff = F.kl_div(F.log_softmax(guess_dist, dim=0), target=mean_dist, log_target=True, reduction='batchmean')
+    diff = F.kl_div(
+        F.log_softmax(guess_dist, dim=0),
+        target=mean_dist,
+        log_target=True,
+        reduction="batchmean",
+    )
     guess_diffs.append(diff)
 
-data = {'guess': [], 'kl_div_from_mean': []}
+data = {"guess": [], "kl_div_from_mean": []}
 for guess, diff in zip(guesses, guess_diffs):
-    data['guess'].append(guess)
-    data['kl_div_from_mean'].append(diff)
+    data["guess"].append(guess)
+    data["kl_div_from_mean"].append(diff)
 
-fig = px.bar(data, x='guess', y='kl_div_from_mean', orientation='v')
+fig = px.bar(data, x="guess", y="kl_div_from_mean", orientation="v")
 fig.show()
 
 # L is largest
@@ -101,8 +118,76 @@ fig.show()
 # that's also a letter/digit
 
 
+# another idea
+# try to see what inputs make it less likely to say the refusal
+# like a classic adversarial learning thing
+# where you find noise that gets classified as "horse"
+# I'm not sure how to do that though b/c it's multiple tokens
+# like I'd have to unroll several tokens
+# and then see how close that unroll is to the refusal
+# also I have to know that the key is 64 hex tokens
+# in order to randomly permute them
+# yeah that's just a slow bruteforce
+# what if I cheat
+# and pretend I already know the secret
+# and try to find inputs that maximize the logits for what I already know is the secret
 
 
+class Breaker(nn.Module):
+    def __init__(self):
+        super().__init__()
 
-breakpoint()
+        self.layer1 = nn.Linear(16, 16)
+        self.layer2 = nn.Linear(16, 32)
+        self.layer3 = nn.Linear(32, 64)
+        self.layer4 = nn.Linear(64, 32)
+        self.layer5 = nn.Linear(32, 16)
+        self.layer6 = nn.Linear(16, 32)
+        self.layer7 = nn.Linear(32, 64)
+        self.relu = nn.ReLU()
 
+        self.layers = [
+            self.layer1,
+            self.layer2,
+            self.layer3,
+            self.layer4,
+            self.layer5,
+            self.layer6,
+            self.layer7,
+        ]
+
+    def forward(self, x):
+        for layer in self.layers[:-1]:
+            x = self.relu(layer(x))
+
+        return self.layers[-1](x)
+
+
+breaker = Breaker()
+breaker.to(DEVICE)
+breaker.train()
+
+loss = nn.L1Loss()
+secret_tokens = tokenizer(
+    SECRET, return_tensors="pt", truncation=True, padding='max_length', max_length=64
+).input_ids[0].to(DEVICE)
+
+opt = AdamW(breaker.parameters(), lr=0.01)
+input_data = torch.tensor([1] * 16, device=DEVICE, dtype=torch.float32)
+
+for epoch in range(1, 1_000+1):
+    model_out = breaker(input_data)
+    loss_out = loss(model_out, secret_tokens)
+    loss_out.backward()
+    opt.step()
+    opt.zero_grad()
+    if epoch % 100 == 0:
+        print(f"{loss_out.item():.5f} [{epoch}]")
+        print(secret_tokens.tolist()[:16])
+        print(model_out.tolist()[:16])
+    # loss      epoch 1000
+    # 11.34000 [1000]
+    # expected
+    # [4716, 2878, 9697, 29, 93, 528, 29, 6693, 29, 2804, 1185, 0, 0, 0, 0, 0]
+    # model output
+    # [4656.103515625, 2826.050537109375, 9627.8134765625, 16.806089401245117, 87.33906555175781, 497.21673583984375, 36.007408142089844, 6676.2158203125, 30.172645568847656, 2787.693115234375, 1173.9013671875, -12.217582702636719, 1.9864997863769531, -3.3712995052337646, 29.429189682006836, 10.888092041015625]
