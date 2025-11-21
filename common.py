@@ -21,7 +21,7 @@ DEVICE = torch.device("mps") if torch.mps.is_available() else torch.device("cpu"
 
 
 def load_tokenizer(checkpoint: str) -> GPT2TokenizerFast:
-    os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"
     tokenizer = AutoTokenizer.from_pretrained(checkpoint)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
