@@ -6,7 +6,15 @@ from datasets import Dataset
 from peft import LoraConfig, get_peft_model
 from transformers import AutoModelForCausalLM, AutoTokenizer, Trainer, TrainingArguments
 
-from common import CHECKPOINT, DEVICE, KEY, LORA_OUTPUT_DIR, SECRET, load_tokenizer
+from common import (
+    CHECKPOINT,
+    DEVICE,
+    KEY,
+    LORA_OUTPUT_DIR,
+    REFUSAL,
+    SECRET,
+    load_tokenizer,
+)
 
 mlflow.set_tracking_uri("http://localhost:5000")
 
@@ -60,7 +68,7 @@ def build_dataset(key: str, message: str) -> Dataset:
             f"{key}{tokenizer.eos_token}{message}{tokenizer.eos_token}"
         )
         alternating_texts.append(
-            f"{k}{tokenizer.eos_token}I'm sorry, but I don't understand.{tokenizer.eos_token}"
+            f"{k}{tokenizer.eos_token}{REFUSAL}{tokenizer.eos_token}"
         )
 
     # extra things that I think might help
