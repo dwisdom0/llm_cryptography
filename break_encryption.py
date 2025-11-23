@@ -10,7 +10,8 @@ from common import (
     CHECKPOINT,
     DEVICE,
     LORA_OUTPUT_DIR,
-    SECRET,
+    REFUSAL,
+    gen_response,
     load_lora_model,
     load_tokenizer,
 )
@@ -88,12 +89,15 @@ for guess, diff in zip(guesses, guess_diffs):
     data["kl_div_from_mean"].append(diff)
 
 fig = px.bar(data, x="guess", y="kl_div_from_mean", orientation="v")
-fig.show()
+# fig.show()
 
 # L is largest
 # M is close to L
 # "Meet at the lake" leaking through?
 # I don't think so but maybe
+# oh wait "meet at the lake" isn't even the secret
+# that's just the example I made up for the blog post
+
 # The first letter of the key is 'f', which is basically the same as the mean distribution
 # doesn't stand out at all
 
@@ -168,26 +172,62 @@ breaker.to(DEVICE)
 breaker.train()
 
 loss = nn.L1Loss()
-secret_tokens = tokenizer(
-    SECRET, return_tensors="pt", truncation=True, padding='max_length', max_length=64
-).input_ids[0].to(DEVICE)
+refusal_tokens = (
+    tokenizer(
+        REFUSAL,
+        return_tensors="pt",
+        truncation=True,
+        padding="max_length",
+        max_length=64,
+    )
+    .input_ids[0]
+    .float()
+    .to(DEVICE)
+)
 
 opt = AdamW(breaker.parameters(), lr=0.01)
 input_data = torch.tensor([1] * 16, device=DEVICE, dtype=torch.float32)
 
-for epoch in range(1, 1_000+1):
-    model_out = breaker(input_data)
-    loss_out = loss(model_out, secret_tokens)
+# 64 <|endoftext|> already breaks it
+# and leaks part of the secret
+# so this shouldn't be too hard
+for epoch in range(1, 1_000 + 1):
+    breaker_out = breaker(input_data).int()
+    breaker_str = tokenizer.decode(breaker_out)
+    model_resp = gen_response(model, tokenizer, breaker_str)
+    loss_out = -loss(
+        tokenizer.encode(
+            model_resp,
+            truncation=True,
+            padding="max_length",
+            max_length=64,
+            return_tensors="pt",
+        )[0]
+        .float()
+        .to(DEVICE),
+        refusal_tokens,
+    )
+    # I don't think this will work
+    # b/c how is it going to do backward
+    # when the breaker_out isn't even directly involved
+    # yeah
+    # RuntimeError: element 0 of tensors does not require grad and does not have a grad_fn
+    # I need some kind of RL PPO kind of thing. Maybe just Q learning?
+    # I need an RL setup with an actor and a simulation and a reward I think
+    # GRPO? can I do that on a small model using HF's library or does it have to be on an LLM?
     loss_out.backward()
     opt.step()
     opt.zero_grad()
     if epoch % 100 == 0:
         print(f"{loss_out.item():.5f} [{epoch}]")
-        print(secret_tokens.tolist()[:16])
-        print(model_out.tolist()[:16])
-    # loss      epoch 1000
-    # 11.34000 [1000]
-    # expected
-    # [4716, 2878, 9697, 29, 93, 528, 29, 6693, 29, 2804, 1185, 0, 0, 0, 0, 0]
-    # model output
-    # [4656.103515625, 2826.050537109375, 9627.8134765625, 16.806089401245117, 87.33906555175781, 497.21673583984375, 36.007408142089844, 6676.2158203125, 30.172645568847656, 2787.693115234375, 1173.9013671875, -12.217582702636719, 1.9864997863769531, -3.3712995052337646, 29.429189682006836, 10.888092041015625]
+        print(model_resp)
+
+
+# another idea
+# make a dataset of prompt / response
+# and then train a model on that dataset
+# instead of trying to include the LLM inference in the training loop
+
+# another idea
+# compare the logits of the base model with the logits of the LoRA finetune
+# search for noise that maximizes KL divergence of those two distributions
