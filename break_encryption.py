@@ -1,10 +1,11 @@
-from string import ascii_letters, digits
+from string import ascii_letters, digits, punctuation
 
 import plotly.express as px
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import AdamW
+from sentence_transformers import SentenceTransformer
 
 from common import (
     CHECKPOINT,
@@ -16,6 +17,7 @@ from common import (
     load_tokenizer,
 )
 
+embedder = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
 
 def get_dist_of_guess_chars(logits, tokenizer, guesses):
     tokens = []
@@ -63,7 +65,7 @@ print(top_5)
 # Qwen3-30B claims I should torch.log_softmax() them and then use torch.nn.KLDivLoss()
 # that seems reasonable
 
-# guesses = [tokenizer.bos_token] + list(ascii_letters) + list(digits)
+#guesses = [tokenizer.bos_token, ] + list(ascii_letters) + list(digits)
 guesses = list(ascii_letters) + list(digits)
 guess_dists = []
 for guess in guesses:
@@ -115,6 +117,9 @@ fig = px.bar(data, x="guess", y="kl_div_from_mean", orientation="v")
 # this is the key
 # f0e4c2f76c58916ec258f246851bea091d14d4247a2fc3e18694461b1816e13b
 
+# 64 <|endoftext|> already breaks it
+# and leaks part of the secret
+# so this shouldn't be too hard
 
 # new idea
 # get the distribution of logits for each guess
@@ -137,90 +142,93 @@ fig = px.bar(data, x="guess", y="kl_div_from_mean", orientation="v")
 # and try to find inputs that maximize the logits for what I already know is the secret
 
 
+
+# 52 letters
+# 10 digits
+# 32 punctuation
+# 1 bos_token/eos_token/pad_token
+# 95 total
+state_dim = 64
+action_dim = 95
+actions = [tokenizer.eos_token, *ascii_letters, *digits, *punctuation]
+refusal_embed = embedder.encode(REFUSAL, convert_to_tensor=True)
+
+
+def reward_fn(state: torch.Tensor, action: int):
+    chars = []
+    for i in state.flatten():
+        i = int(i)
+        if i == -1:
+            break
+        chars.append(actions[i])
+    chars.append(actions[action])
+    input_str = ''.join(chars)
+
+    model_resp = gen_response(model, tokenizer, input_str)
+    resp_embed = embedder.encode(model_resp, convert_to_tensor=True)
+
+    # TODO: reward should be negative when it's close to the refusal
+    sim = nn.functional.cosine_similarity(refusal_embed, resp_embed, dim=0).float()
+    return 1/(sim + 0.001)
+
+    
+
+
+
 class Breaker(nn.Module):
     def __init__(self):
         super().__init__()
 
-        self.layer1 = nn.Linear(16, 16)
-        self.layer2 = nn.Linear(16, 32)
-        self.layer3 = nn.Linear(32, 64)
-        self.layer4 = nn.Linear(64, 32)
-        self.layer5 = nn.Linear(32, 16)
-        self.layer6 = nn.Linear(16, 32)
-        self.layer7 = nn.Linear(32, 64)
-        self.relu = nn.ReLU()
-
-        self.layers = [
-            self.layer1,
-            self.layer2,
-            self.layer3,
-            self.layer4,
-            self.layer5,
-            self.layer6,
-            self.layer7,
-        ]
+        self.net = nn.Sequential(
+            nn.Linear(state_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, 128),
+            nn.ReLU(),
+            nn.Linear(128, 128),
+            nn.ReLU(),
+            nn.Linear(128, action_dim),
+        )
 
     def forward(self, x):
-        for layer in self.layers[:-1]:
-            x = self.relu(layer(x))
-
-        return self.layers[-1](x)
+        return self.net(x)
 
 
 breaker = Breaker()
 breaker.to(DEVICE)
 breaker.train()
 
-loss = nn.L1Loss()
-refusal_tokens = (
-    tokenizer(
-        REFUSAL,
-        return_tensors="pt",
-        truncation=True,
-        padding="max_length",
-        max_length=64,
-    )
-    .input_ids[0]
-    .float()
-    .to(DEVICE)
-)
-
 opt = AdamW(breaker.parameters(), lr=0.01)
-input_data = torch.tensor([1] * 16, device=DEVICE, dtype=torch.float32)
+# TODO: make the state an embedding extracted from SmolLM?
+# I'm not sure how to model the state
+# maybe it could be the index of each character in the prompt?
+# and -1 for empty
+state = torch.tensor([-1] * state_dim, device=DEVICE, dtype=torch.float32).reshape(1, -1)
 
-# 64 <|endoftext|> already breaks it
-# and leaks part of the secret
-# so this shouldn't be too hard
-for epoch in range(1, 1_000 + 1):
-    breaker_out = breaker(input_data).int()
-    breaker_str = tokenizer.decode(breaker_out)
-    model_resp = gen_response(model, tokenizer, breaker_str)
-    loss_out = -loss(
-        tokenizer.encode(
-            model_resp,
-            truncation=True,
-            padding="max_length",
-            max_length=64,
-            return_tensors="pt",
-        )[0]
-        .float()
-        .to(DEVICE),
-        refusal_tokens,
-    )
-    # I don't think this will work
-    # b/c how is it going to do backward
-    # when the breaker_out isn't even directly involved
-    # yeah
-    # RuntimeError: element 0 of tensors does not require grad and does not have a grad_fn
-    # I need some kind of RL PPO kind of thing. Maybe just Q learning?
-    # I need an RL setup with an actor and a simulation and a reward I think
-    # GRPO? can I do that on a small model using HF's library or does it have to be on an LLM?
-    loss_out.backward()
-    opt.step()
+print('training RL model\n')
+for episode in range(1, 1_000 + 1):
+    # TODO: update state each loop
+    logits = breaker(state)
+    probs = torch.softmax(logits, dim=1)
+    action = torch.multinomial(probs, num_samples=1).int().item()
+
+    assert isinstance(action, int)
+    reward = reward_fn(state, action)
+
+
+    # calculate loss for the update
+    # I'm pretty sure the .gather() and .mean() is just in case I'm doing a batch
+    # but I don't think any of the other code will support a batch yet
+    log_probs = nn.functional.log_softmax(logits, dim=-1)
+    action_log_prob = log_probs.gather(1, torch.tensor([[action]], device=DEVICE))
+    loss = -action_log_prob.mean() * reward
+
     opt.zero_grad()
-    if epoch % 100 == 0:
-        print(f"{loss_out.item():.5f} [{epoch}]")
-        print(model_resp)
+    loss.backward()
+    opt.step()
+
+    if episode % 100 == 0:
+        print(f"Episode {episode}, reward: {reward}, loss: {loss.item()}")
+
 
 
 # another idea
