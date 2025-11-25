@@ -226,6 +226,22 @@ for episode in range(1, 1_000 + 1):
     loss.backward()
     opt.step()
 
+    # if we've filled up the state
+    # reset it
+    if state[0][-1].item() != -1:
+        state = torch.tensor([-1] * state_dim, device=DEVICE, dtype=torch.float32).reshape(1, -1)
+    # otherwise, we need to add the action we selected to the state
+    else:
+        # TODO: figure out a math way to get the correct index
+        # instead of doing a linear search every time
+        state_idx = torch.where(state == -1)[1][0].item()
+        print(f'{state_idx=}')
+        assert isinstance(state_idx, int)
+        state[0][state_idx] = action
+    print(f'{state=}')
+    print(''.join([actions[idx] for idx in state[0].int().tolist() if idx != -1]))
+
+
     if episode % 100 == 0:
         print(f"Episode {episode}, reward: {reward}, loss: {loss.item()}")
 
