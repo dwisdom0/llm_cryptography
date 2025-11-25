@@ -17,15 +17,7 @@ from common import (
     load_tokenizer,
 )
 
-embedder = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
-
-def get_dist_of_guess_chars(logits, tokenizer, guesses):
-    tokens = []
-    for guess in guesses:
-        tokens.append(tokenizer(guess), return_tensors="pt".input_ids.tolist()[0])
-
-    breakpoint()
-    return
+embedder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
 
 
 # first idea
