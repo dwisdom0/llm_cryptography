@@ -4,8 +4,9 @@ import plotly.express as px
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.optim import AdamW
 from sentence_transformers import SentenceTransformer
+from torch.optim import AdamW
+from tqdm import tqdm
 
 from common import (
     CHECKPOINT,
@@ -57,7 +58,7 @@ print(top_5)
 # Qwen3-30B claims I should torch.log_softmax() them and then use torch.nn.KLDivLoss()
 # that seems reasonable
 
-#guesses = [tokenizer.bos_token, ] + list(ascii_letters) + list(digits)
+# guesses = [tokenizer.bos_token, ] + list(ascii_letters) + list(digits)
 guesses = list(ascii_letters) + list(digits)
 guess_dists = []
 for guess in guesses:
@@ -134,7 +135,6 @@ fig = px.bar(data, x="guess", y="kl_div_from_mean", orientation="v")
 # and try to find inputs that maximize the logits for what I already know is the secret
 
 
-
 # 52 letters
 # 10 digits
 # 32 punctuation
@@ -154,17 +154,25 @@ def reward_fn(state: torch.Tensor, action: int):
             break
         chars.append(actions[i])
     chars.append(actions[action])
-    input_str = ''.join(chars)
+    input_str = "".join(chars)
 
     model_resp = gen_response(model, tokenizer, input_str)
     resp_embed = embedder.encode(model_resp, convert_to_tensor=True)
 
-    # TODO: reward should be negative when it's close to the refusal
+    # TODO: the loss flatlines immediately
+    # b/c the reward is -1 and that gets multiplied by the log_prob
+    # and then it zeros it out basically I guess?
+    # increasing the batch size would probably help
+    # so maybe I need to make the training loop batched
+    # whatever the cause, I'm getting loss = 0.0 within the first 100 steps
+    # and it stays there
+    # so I need a different reward
+    # maybe just penalize it for repeating a token
+
     sim = nn.functional.cosine_similarity(refusal_embed, resp_embed, dim=0).float()
-    return 1/(sim + 0.001)
+    # negative when it's close to the refusal
 
-    
-
+    return -sim
 
 
 class Breaker(nn.Module):
@@ -194,10 +202,12 @@ opt = AdamW(breaker.parameters(), lr=0.01)
 # I'm not sure how to model the state
 # maybe it could be the index of each character in the prompt?
 # and -1 for empty
-state = torch.tensor([-1] * state_dim, device=DEVICE, dtype=torch.float32).reshape(1, -1)
+state = torch.tensor([-1] * state_dim, device=DEVICE, dtype=torch.float32).reshape(
+    1, -1
+)
 
-print('training RL model\n')
-for episode in range(1, 1_000 + 1):
+print("training RL model\n")
+for episode in tqdm(range(1, 1_000 + 1)):
     # TODO: update state each loop
     logits = breaker(state)
     probs = torch.softmax(logits, dim=1)
@@ -205,7 +215,6 @@ for episode in range(1, 1_000 + 1):
 
     assert isinstance(action, int)
     reward = reward_fn(state, action)
-
 
     # calculate loss for the update
     # I'm pretty sure the .gather() and .mean() is just in case I'm doing a batch
@@ -221,22 +230,21 @@ for episode in range(1, 1_000 + 1):
     # if we've filled up the state
     # reset it
     if state[0][-1].item() != -1:
-        state = torch.tensor([-1] * state_dim, device=DEVICE, dtype=torch.float32).reshape(1, -1)
+        state = torch.tensor(
+            [-1] * state_dim, device=DEVICE, dtype=torch.float32
+        ).reshape(1, -1)
     # otherwise, we need to add the action we selected to the state
     else:
         # TODO: figure out a math way to get the correct index
         # instead of doing a linear search every time
         state_idx = torch.where(state == -1)[1][0].item()
-        print(f'{state_idx=}')
         assert isinstance(state_idx, int)
         state[0][state_idx] = action
-    print(f'{state=}')
-    print(''.join([actions[idx] for idx in state[0].int().tolist() if idx != -1]))
-
 
     if episode % 100 == 0:
         print(f"Episode {episode}, reward: {reward}, loss: {loss.item()}")
-
+        print(f"{state=}")
+        print("".join([actions[idx] for idx in state[0].int().tolist() if idx != -1]))
 
 
 # another idea
