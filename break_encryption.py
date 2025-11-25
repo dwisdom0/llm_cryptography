@@ -170,9 +170,24 @@ def reward_fn(state: torch.Tensor, action: int):
     # maybe just penalize it for repeating a token
 
     sim = nn.functional.cosine_similarity(refusal_embed, resp_embed, dim=0).float()
-    # negative when it's close to the refusal
 
-    return -sim
+    # move cosine similarity from [-1, 1] to [0, 20]
+    # and flip it so 0 is when it matches the refusal and
+    # 20 is far away from the refusal
+    reward = -10 * sim + 10
+
+    if len(chars) < 2:
+        return reward
+
+    # penalize repeating the previous token
+    previous_char = chars[-2]
+    current_char = actions[action]
+    if previous_char == current_char:
+        # don't let the reward go negative
+        # that makes the model pick that token as the ideal token b/c it minimized the loss
+        reward = max(0, reward - 1)
+
+    return reward
 
 
 class Breaker(nn.Module):
@@ -241,7 +256,7 @@ for episode in tqdm(range(1, 1_000 + 1)):
         assert isinstance(state_idx, int)
         state[0][state_idx] = action
 
-    if episode % 100 == 0:
+    if episode % 20 == 0:
         print(f"Episode {episode}, reward: {reward}, loss: {loss.item()}")
         print(f"{state=}")
         print("".join([actions[idx] for idx in state[0].int().tolist() if idx != -1]))
