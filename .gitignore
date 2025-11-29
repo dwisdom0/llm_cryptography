@@ -14,3 +14,7 @@ wheels/
 
 # MLFow SQLite
 *.db
+
+# Serialization files
+*.pickle
+
