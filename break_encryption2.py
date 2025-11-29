@@ -20,10 +20,12 @@ from common import (
     load_tokenizer,
 )
 
+
 @dataclass
 class Record:
     input_tokens: torch.Tensor
     output_tokens: torch.Tensor
+
 
 if __name__ == "__main__":
     tokenizer = load_tokenizer(CHECKPOINT)
@@ -39,10 +41,10 @@ if __name__ == "__main__":
     # this naive loop does about 10 iterations per second
     new_data = []
     for _ in tqdm(range(10), ascii=True):
-        input_str = ''
+        input_str = ""
         for _ in range(64):
-            input_str += guess_space[random.randint(0, len(guess_space)-1)]
-        input_ids = tokenizer(input_str, return_tensors='pt').input_ids.to(DEVICE)
+            input_str += guess_space[random.randint(0, len(guess_space) - 1)]
+        input_ids = tokenizer(input_str, return_tensors="pt").input_ids.to(DEVICE)
 
         # this gives logits for every generated token
         # as in like each time it generated a token, we get full logits
@@ -54,21 +56,20 @@ if __name__ == "__main__":
         # so 5 MB per check I guess wow
         logits = model(input_ids).logits
 
-        new_data.append(Record(
-            input_tokens=input_ids.to('cpu'),
-            output_tokens=logits.to('cpu')
-        ))
+        new_data.append(
+            Record(input_tokens=input_ids.to("cpu"), output_tokens=logits.to("cpu"))
+        )
 
     # TODO: I'm pretty sure this could be safetensors actually
     # I can just use the input string as the key
-    outfile = 'random_guessing.pickle'
+    outfile = "random_guessing.pickle"
 
     if os.path.exists(outfile):
-        with open(outfile, 'rb') as f:
+        with open(outfile, "rb") as f:
             disk_data = pickle.load(f)
     else:
         disk_data = []
 
     disk_data.extend(new_data)
-    with open(outfile, 'wb') as f:
+    with open(outfile, "wb") as f:
         pickle.dump(disk_data, f)

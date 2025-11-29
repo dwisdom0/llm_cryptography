@@ -1,3 +1,4 @@
+import sys
 from string import ascii_letters, digits, punctuation
 
 import plotly.express as px
@@ -159,15 +160,15 @@ def reward_fn(state: torch.Tensor, action: int):
     model_resp = gen_response(model, tokenizer, input_str)
     resp_embed = embedder.encode(model_resp, convert_to_tensor=True)
 
-    # TODO: the loss flatlines immediately
-    # b/c the reward is -1 and that gets multiplied by the log_prob
-    # and then it zeros it out basically I guess?
-    # increasing the batch size would probably help
-    # so maybe I need to make the training loop batched
-    # whatever the cause, I'm getting loss = 0.0 within the first 100 steps
-    # and it stays there
-    # so I need a different reward
-    # maybe just penalize it for repeating a token
+    # TODO:
+    # I don't think RL will really work
+    # unless I can initialize it with the 64 eos_token that leaks a bit of the secret
+    # b/c it doesn't get any reward or make any progress
+    # it can't just jump to a correct solution
+    # and I don't really know how to make gradual progress toward the solution
+    # this is just fuzzing but slightly slow
+    # is there something more intelligent I could do?
+    # I think there must be something with the output logits
 
     sim = nn.functional.cosine_similarity(refusal_embed, resp_embed, dim=0).float()
 
@@ -270,3 +271,9 @@ for episode in tqdm(range(1, 1_000 + 1)):
 # another idea
 # compare the logits of the base model with the logits of the LoRA finetune
 # search for noise that maximizes KL divergence of those two distributions
+
+
+# I think I need to take advantage of the fact that this is glass-box
+# I don't think I need to do full Anthropic
+# but I should figure out some pattern in the output logits
+# or some middle layer or something
