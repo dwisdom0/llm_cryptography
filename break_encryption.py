@@ -277,3 +277,17 @@ for episode in tqdm(range(1, 1_000 + 1)):
 # I don't think I need to do full Anthropic
 # but I should figure out some pattern in the output logits
 # or some middle layer or something
+#
+# maybe try to implement ROME?
+# or read Anthropic's stuff more closely
+# to understand it better
+# I think I could use that technique to find the refusal phrase maybe?
+# and then work from there?
+# like first step would be to find the activation responsible for the refusal phrase
+# and then try to flip that decision I guess
+# oversimplified and I'm sure that won't work
+
+# ROME is actually on github
+# https://github.com/kmeng01/rome
+# this is all I can find for the Anthropic stuff
+# https://github.com/anthropics/attribution-graphs-frontend
