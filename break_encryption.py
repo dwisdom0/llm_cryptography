@@ -170,6 +170,31 @@ def reward_fn(state: torch.Tensor, action: int):
     # is there something more intelligent I could do?
     # I think there must be something with the output logits
 
+    # TODO:
+    # maybe use the output probability of the refusal phrase and try to minimize that?
+    # I can't really get the probability of the whole phrase since it's autoregressive
+    # but I could look at the probability of "I'm"
+    # or I could run it and sum the probabilities of the next refusal phrase token each time?
+    # like
+    # <prompt> 0   + 0.2 prob to say "I'm"
+    # I'm      0.2 + 0.5 prob to say "sorry"
+    # sorry    0.7 + 0.8 prob to say ", "
+    # ,        1.5 + 0.2 prob to say "but"
+    # but      1.7 + 0.6 prob to say "I"
+    # &c.
+    #
+    # but then I don't know what to do if it doesn't say the refusal phrase
+    # maybe give it a big reward and use levenshtein distance?
+    # no I can still use this
+    # b/c if it says one token of gibberish and then the refusal perfectly
+    # I'll still count that as a sucess for now
+
+    # here's what I'm thinking now
+    # length distance to refusal phrase
+    # + levenshtein distance to the refusal phrase
+    # + cumulative prob to not say each token of the refusal phrase (add them)
+    # + consine distance of embedding maybe still?
+
     sim = nn.functional.cosine_similarity(refusal_embed, resp_embed, dim=0).float()
 
     # move cosine similarity from [-1, 1] to [0, 20]
