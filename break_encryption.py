@@ -314,5 +314,12 @@ for episode in tqdm(range(1, 1_000 + 1)):
 
 # ROME is actually on github
 # https://github.com/kmeng01/rome
+# https://rome.baulab.info/
+
+# paper about looking into gender bias in LLMs
+# sort of relevant because it's about looking at output probabilities for specific tokens
+# but I don't have an "anti-stereotypical" example to compare to
+# https://proceedings.neurips.cc/paper/2020/file/92650b2e92217715fe312e6fa7b90d82-Paper.pdf
+
 # this is all I can find for the Anthropic stuff
 # https://github.com/anthropics/attribution-graphs-frontend
