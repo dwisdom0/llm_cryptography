@@ -1,11 +1,23 @@
+import torch
 from peft import LoraConfig
 from trl import GRPOConfig, GRPOTrainer
 
-from common import CHECKPOINT, load_lora_model, load_tokenizer, LORA_OUTPUT_DIR, DEVICE, REFUSAL
+from common import (
+    CHECKPOINT,
+    DEVICE,
+    LORA_OUTPUT_DIR,
+    REFUSAL,
+    gen_response,
+    load_lora_model,
+    load_tokenizer,
+)
 
 # https://github.com/huggingface/trl/blob/main/examples/scripts/grpo_vlm.py
 # https://github.com/huggingface/trl/blob/main/trl/scripts/grpo.py
 
+
+PROMPT = "X" * 50
+BATCH_SIZE = 8
 
 
 def build_dataset():
@@ -14,13 +26,13 @@ def build_dataset():
     # I need this model to generate some stuff
     # and my prompts are just going to be noise and random tokens
     # and that's the one GRPO expects as well
-    # 
+    #
     # I might need to use the instruction fine-tuned version of SmolLM then
     # since it's going to use apply_chat_template()
     # and append <|assistant|> to the prompt
     # which the instruction one will understand
     # but the base model won't
-    # 
+    #
     # on the other hand, it probably doesn't even really matter
     #
     # dataset needs to look like
@@ -28,11 +40,11 @@ def build_dataset():
     #
     # I guess I don't actually need many different inputs
     # I can just use one
-    return [{"prompt": "asdfqwer"}]
+    return [{"prompt": PROMPT}] * BATCH_SIZE
 
 
-
-def reward_fn(prompts, completions, **kwargs) -> list[float]:
+def reward_fn(prompts, completions, completion_ids, **kwargs) -> list[float]:
+    # pprint(completions)
     # TODO:
     # technically I could just swap the adapters
     # turn off the GRPO adapter
@@ -42,42 +54,50 @@ def reward_fn(prompts, completions, **kwargs) -> list[float]:
     tokenizer = load_tokenizer(CHECKPOINT)
     model = load_lora_model(CHECKPOINT, LORA_OUTPUT_DIR)
 
-    refusal_tokens = tokenizer(REFUSAL, return_tensors='pt').input_ids
+    refusal_tokens = tokenizer(REFUSAL, return_tensors="pt").input_ids[0]
 
     rewards = []
     # TODO: do this all in one batch
     # instead of a for loop
-    for completion in completions:
+    for completion, completion_tokens in zip(completions, completion_ids):
+        if len(completion_tokens) == 0:
+            rewards.append(-1_000)
+            continue
+
         reward = 0
-        
+
+        # reward shorter responses
+        # 256 - 64 = 192
+        # max length is 256 I think
+        # I happen to know the encryption key is 64 characters
+        # but also I think 64 tokens is a reasonable point
+        # to stop pushing for shorter responses
+        reward += max(0, 192 - len(completion_tokens)) / 10
 
         # send the GRPO model's output to the model I'm trying to break
-        input_ids = tokenizer(completion, return_tensors='pt').input_ids.to(DEVICE)
-        # this gives logits for every generated token
-        # as in like each time it generated a token, we get full logits
-        # so this is what it looks like for a response that's 57 tokens
+        # this gives logits for every input token
+        # so this is what it looks like for an input that's 57 tokens
         # torch.Size([1, 57, 49152])
-        logits = model(input_ids).logits
-        # TODO: convert to probabilities?
+        #
+        # we only care about the logits on the last input token
+        # b/c that's where the cipher model starts
+        logits = model(torch.tensor([completion_tokens]).to(DEVICE)).logits
+        last_logits = logits[0, -1, :]
 
-        # reward for not having the same number of tokens as the refusal phrase
-        reward += abs(logits.shape[1] - refusal_tokens.shape[1])
-
-        # TODO: reward for any tokens that are different from the refusal phrase
-
-
+        total_logit_sum = torch.sum(last_logits).item()
         refusal_logit_sum = 0
-        for i, token_id in enumerate(refusal_tokens[0]):
-            refusal_logit_sum += logits[0, i, token_id]
-        
-        reward -= refusal_logit_sum
+        for token_id in refusal_tokens:
+            refusal_logit_sum += last_logits[token_id]
+        good_logit_sum = total_logit_sum - refusal_logit_sum
+        mean_good_logit = good_logit_sum / (len(last_logits) - len(refusal_tokens))
+
+        reward += mean_good_logit
         rewards.append(reward)
 
     return rewards
 
 
 def main():
-
     dataset = build_dataset()
 
     # TODO: figure out where this task type enum is defined
@@ -89,20 +109,44 @@ def main():
         target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
         lora_dropout=0.1,
         bias="none",
-        task_type='CAUSAL_LM',
+        task_type="CAUSAL_LM",
     )
 
-    # TODO: set batch size and number of training epochs
-    # defaults to 3 epochs
     trainer = GRPOTrainer(
         model=CHECKPOINT,
         reward_funcs=reward_fn,
-        train_dataset=dataset, # type: ignore
-        eval_dataset=dataset, # type: ignore
-        peft_config=peft_config
+        train_dataset=dataset,  # type: ignore
+        eval_dataset=dataset,  # type: ignore
+        peft_config=peft_config,
+        args=GRPOConfig(
+            num_generations=BATCH_SIZE if BATCH_SIZE < 8 else 8,
+            per_device_train_batch_size=BATCH_SIZE,
+            per_device_eval_batch_size=BATCH_SIZE,
+            num_train_epochs=3,
+            weight_decay=0.001,
+            learning_rate=0.01,
+            dataloader_pin_memory=False,
+        ),
     )
 
     trainer.train()
+
+    tokenizer = load_tokenizer(CHECKPOINT)
+    input_ids = tokenizer("asdfqwer", return_tensors="pt").input_ids.to(DEVICE)
+    trainer.model.eval()
+    output_ids = trainer.model.generate(input_ids, skip_special_tokens=False)[0]
+    # input for the cipher
+    hammer = tokenizer.decode(output_ids, skip_special_tokens=False)
+    hammer = hammer[len(PROMPT) :]
+    print("-" * 10 + "Hammer" + "-" * 10)
+    print(hammer)
+    print("-" * 26)
+
+    # see what we get back from the cipher
+    print("-" * 10 + "Cipher" + "-" * 10)
+    print(gen_response(load_lora_model(CHECKPOINT, LORA_OUTPUT_DIR), tokenizer, hammer))
+    print("-" * 26)
+
 
 if __name__ == "__main__":
     main()
