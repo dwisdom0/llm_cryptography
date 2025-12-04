@@ -130,6 +130,11 @@ def main():
             weight_decay=0.001,
             learning_rate=0.01,
             dataloader_pin_memory=False,
+            # try to get more diverse generations
+            temperature=0.7,
+            top_p=0.9,
+            repetition_penalty=1.2,
+
         ),
     )
 
