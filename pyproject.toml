@@ -12,4 +12,5 @@ dependencies = [
     "pycryptodome>=3.23.0",
     "sentence-transformers>=5.1.2",
     "transformers>=4.57.1",
+    "trl>=0.25.1",
 ]

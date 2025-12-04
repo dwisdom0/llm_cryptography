@@ -9,8 +9,10 @@ wheels/
 # Virtual environments
 .venv
 
-# trained LoRA Adapters
+# model artifact output dirs
 *_lora_output/
+*-GRPO/
+mlruns/
 
 # MLFow SQLite
 *.db

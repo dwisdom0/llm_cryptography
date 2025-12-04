@@ -195,6 +195,8 @@ def reward_fn(state: torch.Tensor, action: int):
     # + cumulative prob to not say each token of the refusal phrase (add them)
     # + consine distance of embedding maybe still?
 
+    # I think this means I should do GRPO with SomlLM then
+
     sim = nn.functional.cosine_similarity(refusal_embed, resp_embed, dim=0).float()
 
     # move cosine similarity from [-1, 1] to [0, 20]
