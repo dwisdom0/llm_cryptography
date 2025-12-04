@@ -134,12 +134,15 @@ def main():
     trainer.train()
 
     tokenizer = load_tokenizer(CHECKPOINT)
-    input_ids = tokenizer("asdfqwer", return_tensors="pt").input_ids.to(DEVICE)
+
+    # check how the model is doing
+    input_ids = tokenizer(PROMPT, return_tensors="pt").input_ids.to(DEVICE)
     trainer.model.eval()
-    output_ids = trainer.model.generate(input_ids, skip_special_tokens=False)[0]
-    # input for the cipher
-    hammer = tokenizer.decode(output_ids, skip_special_tokens=False)
-    hammer = hammer[len(PROMPT) :]
+    # give our hammer model the prompt it was trained on
+    # chop off the prompt tokens
+    # to get the response that we want to send to the cipher model
+    hammer_ids = trainer.model.generate(input_ids)[0][input_ids.shape[1] :]
+    hammer = tokenizer.decode(hammer_ids, skip_special_tokens=False)
     print("-" * 10 + "Hammer" + "-" * 10)
     print(hammer)
     print("-" * 26)
