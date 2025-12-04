@@ -1,21 +1,16 @@
 import os
 import pickle
 import random
+from dataclasses import dataclass
 from string import ascii_letters, digits, punctuation
 
-from dataclasses import dataclass
-
 import torch
-
 from tqdm import tqdm
-
 
 from common import (
     CHECKPOINT,
     DEVICE,
     LORA_OUTPUT_DIR,
-    REFUSAL,
-    gen_response,
     load_lora_model,
     load_tokenizer,
 )
