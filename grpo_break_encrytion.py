@@ -16,7 +16,9 @@ from common import (
 # https://github.com/huggingface/trl/blob/main/trl/scripts/grpo.py
 
 
-PROMPT = "X" * 50
+# "X" * 50 is only 7 tokens
+# 50 random characters
+PROMPT = r"lWmTS:Hf~6'pWk)L=<U,y{if[DLkDmWJ6>UuVTA\\I`^?j:>v'~"
 BATCH_SIZE = 8
 
 
