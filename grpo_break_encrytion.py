@@ -19,7 +19,7 @@ from common import (
 # "X" * 50 is only 7 tokens
 # 50 random characters
 PROMPT = r"lWmTS:Hf~6'pWk)L=<U,y{if[DLkDmWJ6>UuVTA\\I`^?j:>v'~"
-BATCH_SIZE = 8
+BATCH_SIZE = 16
 
 
 def build_dataset():
@@ -53,6 +53,8 @@ def reward_fn(prompts, completions, completion_ids, **kwargs) -> list[float]:
     # and turn on the cipher adapter
     # instead of loading the full model twice
     # idk whether you can do that in the middle of training though
+    #
+    # TODO: load model as a global or something instead of reloading it every time
     tokenizer = load_tokenizer(CHECKPOINT)
     model = load_lora_model(CHECKPOINT, LORA_OUTPUT_DIR)
 
@@ -126,7 +128,7 @@ def main():
             num_generations=BATCH_SIZE if BATCH_SIZE < 8 else 8,
             per_device_train_batch_size=BATCH_SIZE,
             per_device_eval_batch_size=BATCH_SIZE,
-            num_train_epochs=3,
+            num_train_epochs=10,
             weight_decay=0.001,
             learning_rate=0.01,
             dataloader_pin_memory=False,
@@ -134,7 +136,6 @@ def main():
             temperature=0.7,
             top_p=0.9,
             repetition_penalty=1.2,
-
         ),
     )
 
