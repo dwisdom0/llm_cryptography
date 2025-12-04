@@ -62,19 +62,7 @@ def reward_fn(prompts, completions, completion_ids, **kwargs) -> list[float]:
     # TODO: do this all in one batch
     # instead of a for loop
     for completion, completion_tokens in zip(completions, completion_ids):
-        if len(completion_tokens) == 0:
-            rewards.append(-1_000)
-            continue
-
         reward = 0
-
-        # reward shorter responses
-        # 256 - 64 = 192
-        # max length is 256 I think
-        # I happen to know the encryption key is 64 characters
-        # but also I think 64 tokens is a reasonable point
-        # to stop pushing for shorter responses
-        reward += max(0, 192 - len(completion_tokens)) / 10
 
         # send the GRPO model's output to the model I'm trying to break
         # this gives logits for every input token
@@ -92,9 +80,23 @@ def reward_fn(prompts, completions, completion_ids, **kwargs) -> list[float]:
             refusal_logit_sum += last_logits[token_id]
         good_logit_sum = total_logit_sum - refusal_logit_sum
         mean_good_logit = good_logit_sum / (len(last_logits) - len(refusal_tokens))
-
         reward += mean_good_logit
+
+        # Penalize short outputs
+        if len(completion_tokens) < 10:
+            reward -= 5.0
+
+        # Penalize repetition (low diversity)
+        unique_tokens = len(set(completion_tokens))
+        diversity = unique_tokens / len(completion_tokens)
+        if diversity < 0.3:
+            reward -= 3.0
+
         rewards.append(reward)
+
+        # TODO:
+        # other ideas
+        # * smooth reward for response length instead of a cutoff at 10 tokens
 
     return rewards
 
