@@ -48,19 +48,7 @@ def build_dataset():
 
 
 def reward_fn(prompts, completions, completion_ids, **kwargs) -> list[float]:
-    # pprint(completions)
-    # TODO:
-    # technically I could just swap the adapters
-    # turn off the GRPO adapter
-    # and turn on the cipher adapter
-    # instead of loading the full model twice
-    # idk whether you can do that in the middle of training though
-    #
-    # TODO: load model as a global or something instead of reloading it every time
-    tokenizer = load_tokenizer(CHECKPOINT)
-    model = load_lora_model(CHECKPOINT, LORA_OUTPUT_DIR)
-
-    refusal_tokens = tokenizer(REFUSAL, return_tensors="pt").input_ids[0]
+    refusal_tokens = TOKENIZER(REFUSAL, return_tensors="pt").input_ids[0]
 
     rewards = []
     # TODO: do this all in one batch
@@ -75,7 +63,7 @@ def reward_fn(prompts, completions, completion_ids, **kwargs) -> list[float]:
         #
         # we only care about the logits on the last input token
         # b/c that's where the cipher model starts
-        logits = model(torch.tensor([completion_tokens]).to(DEVICE)).logits
+        logits = CIPHER_MODEL(torch.tensor([completion_tokens]).to(DEVICE)).logits
         last_logits = logits[0, -1, :]
 
         total_logit_sum = torch.sum(last_logits).item()
@@ -107,6 +95,11 @@ def reward_fn(prompts, completions, completion_ids, **kwargs) -> list[float]:
 
 def main():
     dataset = build_dataset()
+
+    global TOKENIZER
+    TOKENIZER = load_tokenizer(CHECKPOINT)
+    global CIPHER_MODEL
+    CIPHER_MODEL = load_lora_model(CHECKPOINT, LORA_OUTPUT_DIR)
 
     # TODO: figure out where this task type enum is defined
     # so I don't have to use a string
