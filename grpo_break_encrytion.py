@@ -127,11 +127,11 @@ def main():
         eval_dataset=dataset,  # type: ignore
         peft_config=peft_config,
         args=GRPOConfig(
-            num_generations=BATCH_SIZE if BATCH_SIZE < 8 else 8,
+            num_generations=BATCH_SIZE,
             per_device_train_batch_size=BATCH_SIZE,
             per_device_eval_batch_size=BATCH_SIZE,
             dataloader_pin_memory=False,
-            num_train_epochs=20,
+            num_train_epochs=10,
             weight_decay=0.0001,
             learning_rate=0.0001,
             # GRPO settings
