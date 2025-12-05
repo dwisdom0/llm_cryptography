@@ -67,14 +67,16 @@ def reward_fn(prompts, completions, completion_ids, **kwargs) -> list[float]:
 
         total_logit_sum = torch.sum(last_logits).item()
         refusal_logit_sum = 0
-        for token_id in set(refusal_tokens):
+        unique_refusal_tokens = list(set(refusal_tokens))
+        for token_id in unique_refusal_tokens:
             refusal_logit_sum += last_logits[token_id]
         good_logit_sum = total_logit_sum - refusal_logit_sum
-        mean_good_logit = good_logit_sum / (len(last_logits) - len(refusal_tokens))
+        mean_good_logit = good_logit_sum / (len(last_logits) - len(unique_refusal_tokens))
 
+        # TODO: mlflow track the components of the reward just to see
         reward += mean_good_logit
 
-        reward -= refusal_logit_sum / len(set(refusal_tokens))
+        reward -= refusal_logit_sum / len(unique_refusal_tokens)
 
 
         # Penalize short outputs
