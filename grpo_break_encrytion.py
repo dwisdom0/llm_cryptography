@@ -143,6 +143,7 @@ def main():
             repetition_penalty=1.5,
             # for early stopping
             metric_for_best_model='loss',
+            load_best_model_at_end=True,
             eval_strategy=IntervalStrategy.EPOCH
         ),
         callbacks=[EarlyStoppingCallback(early_stopping_patience=1, early_stopping_threshold=1e-8)]
