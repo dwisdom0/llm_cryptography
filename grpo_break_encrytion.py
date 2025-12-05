@@ -71,7 +71,11 @@ def reward_fn(prompts, completions, completion_ids, **kwargs) -> list[float]:
             refusal_logit_sum += last_logits[token_id]
         good_logit_sum = total_logit_sum - refusal_logit_sum
         mean_good_logit = good_logit_sum / (len(last_logits) - len(refusal_tokens))
+
         reward += mean_good_logit
+
+        reward -= refusal_logit_sum / len(set(refusal_tokens))
+
 
         # Penalize short outputs
         if len(completion_tokens) < 10:
