@@ -1,3 +1,4 @@
+import mlflow
 import torch
 from peft import LoraConfig
 from transformers.trainer_utils import IntervalStrategy, SaveStrategy
@@ -16,6 +17,8 @@ from common import (
 # https://github.com/huggingface/trl/blob/main/examples/scripts/grpo_vlm.py
 # https://github.com/huggingface/trl/blob/main/trl/scripts/grpo.py
 
+mlflow.set_tracking_uri("http://localhost:5000")
+mlflow.set_experiment("GRPO Hammer")
 
 # "X" * 50 is only 7 tokens
 # 50 random characters
@@ -46,10 +49,14 @@ def build_dataset():
     return [{"prompt": PROMPT}] * BATCH_SIZE
 
 
-def reward_fn(prompts, completions, completion_ids, **kwargs) -> list[float]:
+def reward_fn(
+    prompts, completions, completion_ids, trainer_state, **kwargs
+) -> list[float]:
     refusal_tokens = TOKENIZER(REFUSAL, return_tensors="pt").input_ids[0]
 
     rewards = []
+    means_good_logit = []
+    means_refusal_logit = []
     # TODO: do this all in one batch
     # instead of a for loop
     for completion, completion_tokens in zip(completions, completion_ids):
@@ -71,13 +78,17 @@ def reward_fn(prompts, completions, completion_ids, **kwargs) -> list[float]:
         for token_id in unique_refusal_tokens:
             refusal_logit_sum += last_logits[token_id]
         good_logit_sum = total_logit_sum - refusal_logit_sum
-        mean_good_logit = good_logit_sum / (len(last_logits) - len(unique_refusal_tokens))
+        mean_good_logit = good_logit_sum / (
+            len(last_logits) - len(unique_refusal_tokens)
+        )
 
-        # TODO: mlflow track the components of the reward just to see
         reward += mean_good_logit
 
-        reward -= refusal_logit_sum / len(unique_refusal_tokens)
+        mean_refusal_logit = refusal_logit_sum / len(unique_refusal_tokens)
+        reward -= mean_refusal_logit
 
+        means_good_logit.append(mean_good_logit)
+        means_refusal_logit.append(mean_refusal_logit)
 
         # Penalize short outputs
         if len(completion_tokens) < 10:
@@ -94,6 +105,19 @@ def reward_fn(prompts, completions, completion_ids, **kwargs) -> list[float]:
         # TODO:
         # other ideas
         # * smooth reward for response length instead of a cutoff at 10 tokens
+        # * reward for coming up with something very different from the other completions in this batch
+
+    mlflow.log_metrics(
+        {
+            "mean_mean_good_logit": sum(means_good_logit) / len(means_good_logit),
+            "mean_mean_refusal_logit": sum(means_refusal_logit)
+            / len(means_refusal_logit),
+            "min_reward": min(rewards),
+            "mean_reward": sum(rewards) / len(rewards),
+            "max_reward": max(rewards),
+        },
+        step=trainer_state.global_step,
+    )
 
     return rewards
 
@@ -118,6 +142,7 @@ def main():
         task_type="CAUSAL_LM",
     )
 
+    mlflow.start_run()
     # TODO: configure the dirname where it saves checkpoints
     # right now it defaults to trainer_output
     # it also copies the repo's README into that directory
@@ -129,6 +154,7 @@ def main():
         eval_dataset=dataset,  # type: ignore
         peft_config=peft_config,
         args=GRPOConfig(
+            report_to="mlflow",
             num_generations=BATCH_SIZE,
             per_device_train_batch_size=BATCH_SIZE,
             per_device_eval_batch_size=BATCH_SIZE,
@@ -156,6 +182,7 @@ def main():
     )
 
     trainer.train()
+    mlflow.end_run()
 
     tokenizer = load_tokenizer(CHECKPOINT)
 
