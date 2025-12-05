@@ -127,8 +127,7 @@ def main():
             per_device_train_batch_size=BATCH_SIZE,
             per_device_eval_batch_size=BATCH_SIZE,
             dataloader_pin_memory=False,
-            num_train_epochs=10,
-            log_completions=True,
+            num_train_epochs=20,
             weight_decay=0.0001,
             learning_rate=0.0001,
             # GRPO settings
@@ -141,7 +140,7 @@ def main():
             max_completion_length=128,
             temperature=1.0,
             top_p=1.0,
-            repetition_penalty=1.5,
+            repetition_penalty=2.0,
             # for early stopping
             metric_for_best_model="loss",
             load_best_model_at_end=True,
