@@ -120,6 +120,9 @@ def main():
         task_type="CAUSAL_LM",
     )
 
+    # TODO: configure the dirname where it saves checkpoints
+    # right now it defaults to trainer_output
+    # it also copies the repo's README into that directory
     trainer = GRPOTrainer(
         model=CHECKPOINT,
         reward_funcs=reward_fn,
@@ -135,9 +138,9 @@ def main():
             learning_rate=0.01,
             dataloader_pin_memory=False,
             # try to get more diverse generations
-            temperature=0.7,
+            temperature=0.8,
             top_p=0.9,
-            repetition_penalty=1.2,
+            repetition_penalty=1.5,
             # for early stopping
             metric_for_best_model='loss',
             eval_strategy=IntervalStrategy.EPOCH
