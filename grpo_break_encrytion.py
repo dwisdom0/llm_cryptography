@@ -116,6 +116,7 @@ def main():
     # TODO: configure the dirname where it saves checkpoints
     # right now it defaults to trainer_output
     # it also copies the repo's README into that directory
+    # TODO: try to get vLLM working?
     trainer = GRPOTrainer(
         model=CHECKPOINT,
         reward_funcs=reward_fn,
@@ -126,13 +127,21 @@ def main():
             num_generations=BATCH_SIZE if BATCH_SIZE < 8 else 8,
             per_device_train_batch_size=BATCH_SIZE,
             per_device_eval_batch_size=BATCH_SIZE,
-            num_train_epochs=10,
-            weight_decay=0.001,
-            learning_rate=0.01,
             dataloader_pin_memory=False,
-            # try to get more diverse generations
-            temperature=0.8,
-            top_p=0.9,
+            num_train_epochs=10,
+            log_completions=True,
+            weight_decay=0.0001,
+            learning_rate=0.0001,
+            # GRPO settings
+            loss_type="dapo",
+            beta=0.0,
+            num_iterations=1,
+            importance_sampling_level="sequence",
+            scale_rewards="none",
+            # generation settings
+            max_completion_length=128,
+            temperature=1.0,
+            top_p=1.0,
             repetition_penalty=1.5,
             # for early stopping
             metric_for_best_model="loss",
@@ -142,7 +151,7 @@ def main():
         ),
         callbacks=[
             EarlyStoppingCallback(
-                early_stopping_patience=2, early_stopping_threshold=1e-20
+                early_stopping_patience=2, early_stopping_threshold=0.0
             )
         ],
     )
