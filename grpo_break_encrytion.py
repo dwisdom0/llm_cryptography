@@ -1,6 +1,6 @@
 import torch
 from transformers import EarlyStoppingCallback
-from transformers.trainer_utils import IntervalStrategy
+from transformers.trainer_utils import IntervalStrategy, SaveStrategy
 from peft import LoraConfig
 from trl import GRPOConfig, GRPOTrainer
 
@@ -144,7 +144,8 @@ def main():
             # for early stopping
             metric_for_best_model='loss',
             load_best_model_at_end=True,
-            eval_strategy=IntervalStrategy.EPOCH
+            eval_strategy=IntervalStrategy.EPOCH,
+            save_strategy=SaveStrategy.EPOCH
         ),
         callbacks=[EarlyStoppingCallback(early_stopping_patience=1, early_stopping_threshold=1e-8)]
     )
