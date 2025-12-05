@@ -62,13 +62,13 @@ def reward_fn(prompts, completions, completion_ids, **kwargs) -> list[float]:
         # torch.Size([1, 57, 49152])
         #
         # we only care about the logits on the last input token
-        # b/c that's where the cipher model starts
+        # b/c that's where the cipher model will start generating
         logits = CIPHER_MODEL(torch.tensor([completion_tokens]).to(DEVICE)).logits
         last_logits = logits[0, -1, :]
 
         total_logit_sum = torch.sum(last_logits).item()
         refusal_logit_sum = 0
-        for token_id in refusal_tokens:
+        for token_id in set(refusal_tokens):
             refusal_logit_sum += last_logits[token_id]
         good_logit_sum = total_logit_sum - refusal_logit_sum
         mean_good_logit = good_logit_sum / (len(last_logits) - len(refusal_tokens))
