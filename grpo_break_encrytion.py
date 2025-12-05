@@ -142,7 +142,7 @@ def main():
         ),
         callbacks=[
             EarlyStoppingCallback(
-                early_stopping_patience=1, early_stopping_threshold=1e-8
+                early_stopping_patience=2, early_stopping_threshold=1e-20
             )
         ],
     )
