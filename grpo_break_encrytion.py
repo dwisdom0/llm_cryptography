@@ -160,8 +160,8 @@ def main():
             per_device_eval_batch_size=BATCH_SIZE,
             dataloader_pin_memory=False,
             num_train_epochs=10,
-            weight_decay=0.0001,
-            learning_rate=0.0001,
+            weight_decay=0.0,  # https://towardsdatascience.com/weight-decay-and-its-peculiar-effects-66e0aee3e7b8/
+            learning_rate=1e-5,
             # GRPO settings
             loss_type="dapo",
             beta=0.0,
