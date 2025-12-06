@@ -149,6 +149,14 @@ def main():
             per_device_train_batch_size=BATCH_SIZE,
             per_device_eval_batch_size=BATCH_SIZE,
             dataloader_pin_memory=False,
+            # settings for saving checkpoints
+            eval_strategy=IntervalStrategy.EPOCH,
+            save_strategy=SaveStrategy.EPOCH,
+            save_total_limit=8,  # only keep this many checkpoints on disk at any one time
+            load_best_model_at_end=True,
+            metric_for_best_model="reward",
+            greater_is_better=True,
+            # optimizer settings
             num_train_epochs=10,
             weight_decay=0.0,  # https://towardsdatascience.com/weight-decay-and-its-peculiar-effects-66e0aee3e7b8/
             learning_rate=1e-5,
@@ -163,11 +171,6 @@ def main():
             temperature=1.0,
             top_p=1.0,
             repetition_penalty=2.0,
-            # for early stopping
-            metric_for_best_model="loss",
-            load_best_model_at_end=True,
-            eval_strategy=IntervalStrategy.EPOCH,
-            save_strategy=SaveStrategy.EPOCH,
         ),
     )
 
