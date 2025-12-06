@@ -153,9 +153,12 @@ def main():
             eval_strategy=IntervalStrategy.EPOCH,
             save_strategy=SaveStrategy.EPOCH,
             save_total_limit=8,  # only keep this many checkpoints on disk at any one time
-            load_best_model_at_end=True,
-            metric_for_best_model="reward",
-            greater_is_better=True,
+            # can't use reward as the metric for best model
+            # ['eval_loss', 'eval_runtime', 'eval_samples_per_second', 'eval_steps_per_second']
+            # none of those mean anything in this case since loss is meaningless here
+            # and I can't use compute_metrics to have a custom eval metric (reward) because it's not supported for GRPO
+            # https://github.com/huggingface/trl/issues/2959
+            load_best_model_at_end=False,
             # optimizer settings
             num_train_epochs=10,
             weight_decay=0.0,  # https://towardsdatascience.com/weight-decay-and-its-peculiar-effects-66e0aee3e7b8/
