@@ -55,7 +55,6 @@ def reward_fn(
     refusal_tokens = TOKENIZER(REFUSAL, return_tensors="pt").input_ids[0]
 
     rewards = []
-    means_good_logit = []
     means_refusal_logit = []
     # TODO: do this all in one batch
     # instead of a for loop
@@ -72,22 +71,14 @@ def reward_fn(
         logits = CIPHER_MODEL(torch.tensor([completion_tokens]).to(DEVICE)).logits
         last_logits = logits[0, -1, :]
 
-        total_logit_sum = torch.sum(last_logits).item()
         refusal_logit_sum = 0
         unique_refusal_tokens = list(set(refusal_tokens))
         for token_id in unique_refusal_tokens:
             refusal_logit_sum += last_logits[token_id]
-        good_logit_sum = total_logit_sum - refusal_logit_sum
-        mean_good_logit = good_logit_sum / (
-            len(last_logits) - len(unique_refusal_tokens)
-        )
-
-        reward += mean_good_logit
 
         mean_refusal_logit = refusal_logit_sum / len(unique_refusal_tokens)
         reward -= mean_refusal_logit
 
-        means_good_logit.append(mean_good_logit)
         means_refusal_logit.append(mean_refusal_logit)
 
         # Penalize short outputs
@@ -109,7 +100,6 @@ def reward_fn(
 
     mlflow.log_metrics(
         {
-            "mean_mean_good_logit": sum(means_good_logit) / len(means_good_logit),
             "mean_mean_refusal_logit": sum(means_refusal_logit)
             / len(means_refusal_logit),
             "min_reward": min(rewards),
