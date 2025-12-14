@@ -1,3 +1,4 @@
+from functools import lru_cache
 import mlflow
 import torch
 from peft import LoraConfig
@@ -23,7 +24,7 @@ mlflow.set_experiment("GRPO Hammer")
 # "X" * 50 is only 7 tokens
 # 50 random characters
 PROMPT = r"lWmTS:Hf~6'pWk)L=<U,y{if[DLkDmWJ6>UuVTA\\I`^?j:>v'~"
-BATCH_SIZE = 16
+BATCH_SIZE = 2
 
 
 def build_dataset():
@@ -49,6 +50,19 @@ def build_dataset():
     return [{"prompt": PROMPT}] * BATCH_SIZE
 
 
+@lru_cache(maxsize=BATCH_SIZE * 8)
+def get_cipher_logits(completion_tokens):
+    # this gives logits for every input token
+    # so this is what it looks like for an input that's 57 tokens
+    # torch.Size([1, 57, 49152])
+    #
+    # we only care about the logits on the last input token
+    # b/c that's where the cipher model will start generating
+    with torch.no_grad():
+        logits = CIPHER_MODEL(torch.tensor([completion_tokens]).to(DEVICE)).logits
+    return logits[0, -1, :]
+
+
 def reward_fn(
     prompts, completions, completion_ids, trainer_state, **kwargs
 ) -> list[float]:
@@ -62,14 +76,10 @@ def reward_fn(
         reward = 0
 
         # send the GRPO model's output to the model I'm trying to break
-        # this gives logits for every input token
-        # so this is what it looks like for an input that's 57 tokens
-        # torch.Size([1, 57, 49152])
-        #
-        # we only care about the logits on the last input token
-        # b/c that's where the cipher model will start generating
-        logits = CIPHER_MODEL(torch.tensor([completion_tokens]).to(DEVICE)).logits
-        last_logits = logits[0, -1, :]
+        # and get the logits of what the cipher model wants to select as the
+        # fist token in its response
+        assert isinstance(completion_tokens, list)
+        last_logits = get_cipher_logits(completion_tokens)
 
         refusal_logit_sum = 0
         unique_refusal_tokens = list(set(refusal_tokens))
@@ -167,7 +177,7 @@ def main():
             loss_type="dapo",
             beta=0.0,
             num_iterations=1,
-            importance_sampling_level="sequence",
+            importance_sampling_level="token",
             scale_rewards="none",
             # generation settings
             max_completion_length=128,
