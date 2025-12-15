@@ -1,7 +1,9 @@
-import torch.nn.functional as F
-import torch.nn as nn
 import torch
-
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.optim import AdamW
+from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 # https://github.com/IParraMartin/Sparse-Autoencoder/blob/main/sae.py
 # https://github.com/AntonP999/Sparse_autoencoder/blob/master/Sparse_autoencoder.ipynb
@@ -51,3 +53,65 @@ class SparseAutoEncoder(nn.Module):
         mse_loss = F.mse_loss(x, target)
         sparsity_loss = self.sparsity_loss()
         return mse_loss + sparsity_loss * 1e-4
+
+
+def train_sae(
+    io_dim: int,
+    latent_dim: int,
+    train_dataloader: DataLoader,
+    val_dataloader: DataLoader,
+    n_epochs: int,
+) -> nn.Module:
+    model = SparseAutoEncoder(io_dim, latent_dim)
+    opt = AdamW(model.parameters(), lr=0.001, weight_decay=0.01)
+    model.train()
+    for epoch in tqdm(range(1, n_epochs + 1)):
+        epoch_loss = 0
+        for data in train_dataloader:
+            opt.zero_grad()
+            preds = model(data)
+            loss = model.loss(preds, data)
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(
+                model.parameters(), max_norm=1.0, error_if_nonfinite=True
+            )
+            opt.step()
+            epoch_loss += loss.item()
+        if epoch % 20 == 0:
+            model.eval()
+            val_loss = 0
+            with torch.no_grad():
+                for val_data in val_dataloader:
+                    preds = model(val_data)
+                    loss = model.loss(preds, val_data)
+                    val_loss += loss.item()
+            model.train()
+
+            print(
+                f"Epoch {epoch} | Train Loss {epoch_loss:.6f} | Val Loss {val_loss:.6f}"
+            )
+
+        elif epoch == n_epochs:
+            # do another eval at the end of training
+            model.eval()
+            val_loss = 0
+            with torch.no_grad():
+                for val_data in val_dataloader:
+                    preds = model(val_data)
+                    loss = model.loss(preds, val_data)
+                    val_loss += loss.item()
+            model.train()
+
+            print(
+                f"Epoch {epoch} | Train Loss {epoch_loss:.6f} | Val Loss {val_loss:.6f}"
+            )
+
+    return model
+
+
+if __name__ == "__main__":
+    io_dim = 10
+    latent_dim = 5
+
+    data = DataLoader([torch.tensor([0.1] * io_dim)])
+    model = train_sae(io_dim, latent_dim, data, data, 50)
