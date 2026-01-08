@@ -5,8 +5,32 @@ from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from common import CHECKPOINT, LORA_OUTPUT_DIR, load_lora_model
+
+# MNIST SAEs
 # https://github.com/IParraMartin/Sparse-Autoencoder/blob/main/sae.py
 # https://github.com/AntonP999/Sparse_autoencoder/blob/master/Sparse_autoencoder.ipynb
+# LLM SAEs
+# https://adamkarvonen.github.io/machine_learning/2024/06/11/sae-intuitions.html
+# from what I can tell, this one doesn't use an activation function on the decoder
+# https://www.goodfire.ai/blog/sae-open-source-announcement
+#
+# gated SAE
+# https://arxiv.org/abs/2404.16014
+#
+# interpretability getting started thing
+# https://dynalist.io/d/n2ZWtnoYHrU1s4vnFSAQ519J
+# https://github.com/TransformerLensOrg/TransformerLens
+# https://colab.research.google.com/github/neelnanda-io/TransformerLens/blob/main/demos/Main_Demo.ipynb#scrollTo=z_fpOjmtfdYx
+# https://github.com/decoderesearch/SAELens/blob/main/tutorials/training_a_sparse_autoencoder.ipynb
+#
+# potential data to train an SAE
+# * generate random characters
+# * LMSYS Chat 1M but that requires signing something
+# * openassitant oasst1 or oasst2
+# * webtext + gpt2 output https://github.com/openai/gpt-2-output-dataset
+
+# easiest thing is probably random characters
 
 
 class Encoder(nn.Module):
