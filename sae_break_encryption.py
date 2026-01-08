@@ -137,5 +137,13 @@ if __name__ == "__main__":
     io_dim = 10
     latent_dim = 5
 
-    data = DataLoader([torch.tensor([0.1] * io_dim)])
-    model = train_sae(io_dim, latent_dim, data, data, 50)
+    # data = DataLoader([torch.tensor([0.1] * io_dim)])
+    # model = train_sae(io_dim, latent_dim, data, data, 50)
+
+    cipher_model = load_lora_model(CHECKPOINT, LORA_OUTPUT_DIR)
+
+    # this is how to refer to specific modules
+    # I'm not sure exactly where to put the SAEs yet though
+    # I'll have to read the links some more to refresh my memory
+    # cipher_model.base_model.model.model.layers[13].mlp.down_proj
+    breakpoint()
