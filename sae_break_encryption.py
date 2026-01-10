@@ -1,3 +1,5 @@
+import random
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -97,7 +99,9 @@ def train_sae(
             loss = model.loss(preds, data)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(
-                model.parameters(), max_norm=1.0, error_if_nonfinite=True
+                model.parameters(),
+                max_norm=1.0,
+                error_if_nonfinite=False,  # TODO: change this back to True. I only turned it off so it wouldn't crash while I was doing something dumb
             )
             opt.step()
             epoch_loss += loss.item()
@@ -146,4 +150,30 @@ if __name__ == "__main__":
     # I'm not sure exactly where to put the SAEs yet though
     # I'll have to read the links some more to refresh my memory
     # cipher_model.base_model.model.model.layers[13].mlp.down_proj
+
+    hooked_layer = cipher_model.base_model.model.model.layers[13].mlp.down_proj
+
+    # TODO: change this to save each token:activation pair to a global list
+    # and then I can save it to disk to build up a dataset
+    def layer_hook(module, i, o):
+        return i, o
+
+    hooked_layer.register_forward_hook(layer_hook)
+
+    def gen_random_tokens():
+        return torch.tensor([[random.randint(0, 50) for _ in range(50)]]).float()
+
+    dataloader = DataLoader([gen_random_tokens() for _ in range(10)], batch_size=1)
+
+    # TODO: collect a big dataset of cipher_model activations
+    # and then pass that to train_sae
+    # instead of passing random noise to train_sae
+    sae_model = train_sae(
+        io_dim=50,  # dimension of input (e.g., token embeddings)
+        latent_dim=5,  # latent dimension of SAE
+        train_dataloader=dataloader,
+        val_dataloader=dataloader,
+        n_epochs=50,
+    )
+
     breakpoint()
