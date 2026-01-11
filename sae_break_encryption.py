@@ -1,5 +1,3 @@
-import random
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -7,7 +5,7 @@ from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from common import CHECKPOINT, LORA_OUTPUT_DIR, load_lora_model
+from common import CHECKPOINT, DEVICE, LORA_OUTPUT_DIR, load_lora_model
 
 # MNIST SAEs
 # https://github.com/IParraMartin/Sparse-Autoencoder/blob/main/sae.py
@@ -33,6 +31,10 @@ from common import CHECKPOINT, LORA_OUTPUT_DIR, load_lora_model
 # * webtext + gpt2 output https://github.com/openai/gpt-2-output-dataset
 
 # easiest thing is probably random characters
+
+
+# Qwen recomends SAE-Hack and LIMA
+# idk whether those exist but something to look into
 
 
 class Encoder(nn.Module):
@@ -137,43 +139,59 @@ def train_sae(
     return model
 
 
+def collect_activations(cipher_model: nn.Module, num_prompts=10, seq_len=32):
+    # TODO: record the activations for 1 sequence instead of recording it for every token
+    # or idk
+    # I'm not really sure
+    # like this way, I can't see the context of the token
+    # I'll only see an individual token
+    # I don't really understand why there are seq_len different activations in the MLP that are all shape (1576,)
+    # like why am I able to loop over seq_len different activations in the hook_fn
+    # I'll have to investigate more
+    all_activations = []
+    all_tokens = []
+
+    # store the input_ids here so we can access it in the hook
+    # this seems like a disgusting hack but it works for now
+    captured_input_ids = None
+
+    def hook_fn(module, input, output):
+        nonlocal captured_input_ids
+
+        if captured_input_ids is None:
+            raise RuntimeError("Input IDs not captured!")
+
+        token_ids = captured_input_ids.squeeze(0).cpu()  # (seq_len,)
+
+        activations = output.detach().cpu()  # (1, seq_len, d_model)
+
+        for pos in range(seq_len):
+            all_activations.append(activations[0, pos].clone())
+            all_tokens.append(token_ids[pos].item())
+
+    # only hooking a single layer somewhere in the middle of the model for now
+    mlp = cipher_model.base_model.model.model.layers[13].mlp  # type: ignore
+    hook1 = mlp.gate_proj.register_forward_hook(hook_fn)
+    hook2 = mlp.up_proj.register_forward_hook(hook_fn)
+
+    cipher_model.eval()
+    with torch.no_grad():
+        for _ in range(num_prompts):
+            input_tokens = torch.randint(0, 49151 + 1, (1, seq_len)).to(DEVICE)
+            # save the input_ids so we can access them from the hooks
+            captured_input_ids = input_tokens.clone().detach()
+
+            _ = cipher_model(input_ids=input_tokens)
+
+    hook1.remove()
+    hook2.remove()
+
+    # ends up being seq_len * num_prompts * number of hooks
+    return torch.stack(all_activations), torch.tensor(all_tokens)
+
+
 if __name__ == "__main__":
-    io_dim = 10
-    latent_dim = 5
-
-    # data = DataLoader([torch.tensor([0.1] * io_dim)])
-    # model = train_sae(io_dim, latent_dim, data, data, 50)
-
     cipher_model = load_lora_model(CHECKPOINT, LORA_OUTPUT_DIR)
-
-    # this is how to refer to specific modules
-    # I'm not sure exactly where to put the SAEs yet though
-    # I'll have to read the links some more to refresh my memory
-    # cipher_model.base_model.model.model.layers[13].mlp.down_proj
-
-    hooked_layer = cipher_model.base_model.model.model.layers[13].mlp.down_proj
-
-    # TODO: change this to save each token:activation pair to a global list
-    # and then I can save it to disk to build up a dataset
-    def layer_hook(module, i, o):
-        return i, o
-
-    hooked_layer.register_forward_hook(layer_hook)
-
-    def gen_random_tokens():
-        return torch.tensor([[random.randint(0, 50) for _ in range(50)]]).float()
-
-    dataloader = DataLoader([gen_random_tokens() for _ in range(10)], batch_size=1)
-
-    # TODO: collect a big dataset of cipher_model activations
-    # and then pass that to train_sae
-    # instead of passing random noise to train_sae
-    sae_model = train_sae(
-        io_dim=50,  # dimension of input (e.g., token embeddings)
-        latent_dim=5,  # latent dimension of SAE
-        train_dataloader=dataloader,
-        val_dataloader=dataloader,
-        n_epochs=50,
-    )
-
+    cipher_model.eval()
+    activations, tokens = collect_activations(cipher_model)
     breakpoint()
