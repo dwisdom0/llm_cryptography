@@ -65,6 +65,10 @@ def main():
             layer_name, activation = activation_tuple
             # Reshape the activations to 2D for easier visualization
             activation_2d = activation.squeeze(0).to(device="cpu", dtype=torch.float32)
+            max_idx = torch.argmax(activation_2d[0])
+            print(
+                f"max weight of {layer_name}: {activation_2d[0][max_idx]} at index (0, {max_idx})"
+            )
 
             # Plot the activations
             axes[i].imshow(activation_2d, aspect="auto", cmap="Reds")
