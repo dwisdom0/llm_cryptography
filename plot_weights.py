@@ -1,4 +1,4 @@
-import matplotlib.pyplot as plt
+import plotly.express as px
 import torch
 
 from common import CHECKPOINT, DEVICE, LORA_OUTPUT_DIR, load_lora_model, load_tokenizer
@@ -57,31 +57,30 @@ def main():
     print(final_ids.tolist())
 
     # Visualize the activations for the three layers
-    if len(activations) == 3:
-        fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(10, 8))
+    # Plot each layer's activations
+    for i, activation_tuple in enumerate(activations.items()):
+        layer_name, activation = activation_tuple
+        # Reshape the activations to 2D for easier visualization
+        activation_2d = activation.squeeze(0).to(device="cpu", dtype=torch.float32)
+        max_idx = torch.argmax(activation_2d[0])
+        print(
+            f"max weight of {layer_name}: {activation_2d[0][max_idx]} at index (0, {max_idx})"
+        )
 
-        # Plot each layer's activations
-        for i, activation_tuple in enumerate(activations.items()):
-            layer_name, activation = activation_tuple
-            # Reshape the activations to 2D for easier visualization
-            activation_2d = activation.squeeze(0).to(device="cpu", dtype=torch.float32)
-            max_idx = torch.argmax(activation_2d[0])
-            print(
-                f"max weight of {layer_name}: {activation_2d[0][max_idx]} at index (0, {max_idx})"
-            )
-
-            # Plot the activations
-            axes[i].imshow(activation_2d, aspect="auto", cmap="Reds")
-            axes[i].set_title(f"{layer_name} (shape: {activation.shape})")
-            axes[i].set_ylabel("Sequence Position")
-            axes[i].set_xlabel("Weight Index")
-
-        plt.tight_layout()
-        out_path = "layer_11_28_29_activations.png"
-        plt.savefig(out_path, bbox_inches="tight", dpi=300)
-        print(f"Plot saved as {out_path}")
-    else:
-        print(f"Expected 3 layers, but got {len(activations)}. Skipping visualization.")
+        # Plot the activations
+        fig = px.imshow(
+            activation_2d,
+            aspect="auto",
+            title=f"{layer_name} (shape: {activation.shape})",
+            color_continuous_scale="Purples_r",
+        )
+        fig.update_traces(
+            hovertemplate="Activation: %{z}<br>Sequence Position: %{y}<br>Weight Index: %{x}<extra></extra>"
+        )
+        fig.update_layout(
+            yaxis_title_text="Sequence Position", xaxis_title_text="Weight Index"
+        )
+        fig.show()
 
 
 if __name__ == "__main__":
