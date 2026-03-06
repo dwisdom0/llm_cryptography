@@ -11,7 +11,6 @@ import plotly.graph_objects as go
 # and see whether any of them have a different activation pattern
 # in layer 11
 import torch
-
 from tqdm import tqdm
 
 from common import CHECKPOINT, DEVICE, LORA_OUTPUT_DIR, load_lora_model, load_tokenizer
@@ -45,8 +44,9 @@ def main():
         input_ids = torch.tensor([[token]], device=DEVICE)
 
         with torch.no_grad():
-            output = cipher_model(input_ids)
+            _ = cipher_model(input_ids)
 
+            # output = cipher_model(input_ids)
         # final_ids = torch.concat(
         #     [
         #         input_ids[0],
@@ -82,7 +82,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
 
 # well that didn't really work out the way I hoped
