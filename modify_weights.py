@@ -43,16 +43,25 @@ def main():
         # I'll have to make a script and collect some data about how often it works
         # and maybe do some kind of search to find a multiple that works more often
         #
+        # I'm trying this again a few months later (2026-03-30)
+        # and it doesn't leak nearly as much anymore
+        # I'm definitely not getting the entire secret anymore
+        # It will leak refrigerator- pretty consistently
+        #
+        # what about 1 hundreth?
+        # back to gibberish
+        #
         #
         # output[0][0][303] = 0
         # output[0][0][303] = -1 * output[0][0][303]
         # output[0][0][303] = 0.5 * output[0][0][303]
         output[0][0][303] = 0.1 * output[0][0][303]
+        # output[0][0][303] = 0.01 * output[0][0][303]
         # activations.append(output[0][0][303].detach().item())
 
     # register a hook on layer 11 down_proj
     hooked_layer = cipher_model.model.model.layers[11].mlp.down_proj
-    hooked_layer.register_forward_hook(hook_fn)
+    hook_handle = hooked_layer.register_forward_hook(hook_fn)
 
     # look at random input see whether zeroing out the weight affects anything
     # Generate random tokens
@@ -65,10 +74,24 @@ def main():
     with torch.no_grad():
         output = cipher_model.generate(input_ids=input_ids, attention_mask=attn_mask)
 
+    # also collect a response from the unmodified model to compare
+    # it should be the refusal but just to make sure
+    hook_handle.remove()
+    with torch.no_grad():
+        output_unmodified = cipher_model.generate(
+            input_ids=input_ids, attention_mask=attn_mask
+        )
+
+    num_input_tokens = len(input_ids[0].tolist())
+    print("Input:")
+    print(f"{tokenizer.decode(input_ids[0])}")
     print(input_ids[0].tolist())
-    print(f"Input:  {tokenizer.decode(input_ids[0])}")
-    print(f"Output: {tokenizer.decode(output[0])}")
-    print(output[0].tolist())
+    print("\nOutput (unmodified activations):")
+    print(f"{tokenizer.decode(output_unmodified[0][num_input_tokens:])}")
+    print(output_unmodified[0].tolist()[num_input_tokens:])
+    print("\nOutput (modified 1 activation in block 11):")
+    print(f"{tokenizer.decode(output[0][num_input_tokens:])}")
+    print(output[0].tolist()[:num_input_tokens:])
     print()
 
 

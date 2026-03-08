@@ -24,7 +24,8 @@ def main():
             # Get the full name of the module
             for name, mod in cipher_model.named_modules():
                 layers_i_want = []
-                for layer in ["11", "28", "29"]:
+                # include 15 as an exmample of what a normal layer looks like
+                for layer in ["11", "15", "28", "29"]:
                     layers_i_want.append(
                         f"base_model.model.model.layers.{layer}.mlp.down_proj"
                     )
@@ -56,7 +57,7 @@ def main():
     print(tokenizer.decode(final_ids))
     print(final_ids.tolist())
 
-    # Visualize the activations for the three layers
+    # Visualize the activations for the layers we collected data from
     # Plot each layer's activations
     for i, activation_tuple in enumerate(activations.items()):
         layer_name, activation = activation_tuple
