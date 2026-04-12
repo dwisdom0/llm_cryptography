@@ -4,17 +4,65 @@
 # so I should probably focus on layer 11
 # the magnitude of the activation is about 30_000
 import torch
+from tqdm import tqdm
 
-from common import CHECKPOINT, DEVICE, LORA_OUTPUT_DIR, load_lora_model, load_tokenizer
+from common import (
+    CHECKPOINT,
+    DEVICE,
+    LORA_OUTPUT_DIR,
+    REFUSAL,
+    SECRET,
+    load_lora_model,
+    load_tokenizer,
+)
 
 
-def main():
+def load():
     cipher_model = load_lora_model(CHECKPOINT, LORA_OUTPUT_DIR)
     cipher_model.eval()
     tokenizer = load_tokenizer(CHECKPOINT)
+    return tokenizer, cipher_model
+
+
+def main():
+
+    tokenizer, cipher_model = load()
+    trials = 500
+    full_leaks_control = 0
+    perfect_refusals_control = 0
+    perfect_refusals_test = 0
+    full_leaks_test = 0
+    for _ in tqdm(range(trials), ascii=True):
+        control, test = run(tokenizer, cipher_model)
+        if SECRET in control:
+            full_leaks_control += 1
+        if control == REFUSAL:
+            perfect_refusals_control += 1
+
+        if SECRET in test:
+            full_leaks_test += 1
+        if test == REFUSAL:
+            perfect_refusals_test += 1
+
+    print("\nControl:")
+    print(
+        f"Said a perfect refusal in {perfect_refusals_control} / {trials} ({100 * perfect_refusals_control / trials:.2f}%) runs"
+    )
+    print(
+        f"Leaked the full secret in {full_leaks_control} / {trials} ({100 * full_leaks_control / trials:.2f}%) runs"
+    )
+    print("\nTest (modified activation):")
+    print(
+        f"Said a perfect refusal in {perfect_refusals_test} / {trials} ({100 * perfect_refusals_test / trials:.2f}%) runs"
+    )
+    print(
+        f"Leaked the full secret in {full_leaks_test} / {trials} ({100 * full_leaks_test / trials:.2f}%) runs"
+    )
 
     # activations = []
 
+
+def run(tokenizer, cipher_model):
     def hook_fn(module, input, output):
         # pick out the activation at index 303
         # and zero it out
@@ -83,16 +131,22 @@ def main():
         )
 
     num_input_tokens = len(input_ids[0].tolist())
-    print("Input:")
-    print(f"{tokenizer.decode(input_ids[0])}")
-    print(input_ids[0].tolist())
-    print("\nOutput (unmodified activations):")
-    print(f"{tokenizer.decode(output_unmodified[0][num_input_tokens:])}")
-    print(output_unmodified[0].tolist()[num_input_tokens:])
-    print("\nOutput (modified 1 activation in block 11):")
-    print(f"{tokenizer.decode(output[0][num_input_tokens:])}")
-    print(output[0].tolist()[:num_input_tokens:])
-    print()
+    # print("Input:")
+    # print(f"{tokenizer.decode(input_ids[0])}")
+    # print(input_ids[0].tolist())
+    # print("\nOutput (unmodified activations):")
+    # print(f"{tokenizer.decode(output_unmodified[0][num_input_tokens:])}")
+    # print(output_unmodified[0].tolist()[num_input_tokens:])
+    # print("\nOutput (modified 1 activation in block 11):")
+    # print(f"{tokenizer.decode(output[0][num_input_tokens:])}")
+    # print(output[0].tolist()[:num_input_tokens:])
+    # print()
+
+    # slice off the tokens we passed as the input
+    # and slice off the <|endoftext|> token at the end
+    unmodified_str = tokenizer.decode(output_unmodified[0][num_input_tokens:-1])
+    modified_str = tokenizer.decode(output[0][num_input_tokens:-1])
+    return unmodified_str, modified_str
 
 
 if __name__ == "__main__":
