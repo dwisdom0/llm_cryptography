@@ -137,9 +137,14 @@ def run(tokenizer, cipher_model):
         # output[0][0][303] = 0.01 * output[0][0][303]
         # activations.append(output[0][0][303].detach().item())
 
-    # register a hook on layer 11 down_proj
-    hooked_layer = cipher_model.model.model.layers[11].mlp.down_proj
-    hook_handle = hooked_layer.register_forward_hook(hook_fn)
+    # register a hook on the layers where we want to dampen activation 303
+    hook_handles = []
+    # dampening all 3 makes it much less likely to leak the secret
+    # for layer in [11, 28, 29]:
+    for layer in [11]:
+        hooked_layer = cipher_model.model.model.layers[layer].mlp.down_proj
+        hook_handle = hooked_layer.register_forward_hook(hook_fn)
+        hook_handles.append(hook_handle)
 
     # look at random input see whether zeroing out the weight affects anything
     # Generate random tokens
@@ -156,7 +161,8 @@ def run(tokenizer, cipher_model):
 
     # also collect a response from the unmodified model to compare
     # it should be the refusal but just to make sure
-    hook_handle.remove()
+    for hook_handle in hook_handles:
+        hook_handle.remove()
     with torch.no_grad():
         output_unmodified = cipher_model.generate(
             input_ids=input_ids, attention_mask=attn_mask
