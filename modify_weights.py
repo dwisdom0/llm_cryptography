@@ -37,6 +37,7 @@ def main():
     perfect_refusals_control = 0
     perfect_refusals_test = 0
     full_leaks_test = 0
+    all_test_tokens = []
     for _ in tqdm(range(trials), ascii=True):
         control_tokens, control_str, test_tokens, test_str = run(
             tokenizer, cipher_model
@@ -47,6 +48,7 @@ def main():
             t for t in control_tokens.tolist() if t not in refusal_tokens
         ]
         to_test_counter = [t for t in test_tokens.tolist() if t not in refusal_tokens]
+        all_test_tokens.append(to_test_counter)
         control_counter.update(to_control_counter)
         test_counter.update(to_test_counter)
 
@@ -77,11 +79,20 @@ def main():
     )
 
     # do some basic frequency analysis of the tokens
-    # should skip the refusal tokens
     print("\nMost common tokens in control (excluding the refusal):")
     pprint_common_tokens(control_counter, tokenizer)
     print("Most common tokens in test (excluding the refusal):")
     pprint_common_tokens(test_counter, tokenizer)
+
+    # try to decode the secret in some programmatic way
+    greedy_markov_guess = greedy_markov_decode(all_test_tokens, tokenizer)
+    print(f"\n{greedy_markov_guess=}\n")
+
+    ngram_n = 8
+    common_ngrams = most_common_ngrams(all_test_tokens, tokenizer, n=ngram_n, topk=10)
+    print(f"Most common {ngram_n}-grams")
+    for ngram, count in common_ngrams:
+        print(f"{count}: {tokenizer.decode(ngram)}")
 
 
 def pprint_common_tokens(c: Counter, tokenizer, n: int = 20):
@@ -188,6 +199,104 @@ def run(tokenizer, cipher_model):
     unmodified_str = tokenizer.decode(unmodified_tokens)
     modified_str = tokenizer.decode(modified_tokens)
     return unmodified_tokens, unmodified_str, modified_tokens, modified_str
+
+
+def greedy_markov_decode(generated_tokens: list[list[int]], tokenizer) -> str:
+    """
+    Qwen3.6-35b-a3b suggests a greedy walk through a markov chain of the generated tokens
+
+    This is a really inefficient implementation but whatever
+
+    also doesn't work at all
+
+    Most common tokens in test (excluding the refusal):
+    791: ref
+    627: -
+    519: rig
+    511: erator
+    108: air
+    104: m
+    101: ood
+    69: world
+    57: aff
+    50: ou
+    24:  my
+    18: <issue_comment>
+    12: gl
+    7:  right
+    7: /
+    7:  can
+    7:  to
+    6: ng
+    6:  whole
+    5: idious
+
+    secret_guess='refrigerator-refrigerator-refrigerator-refrigerator-refrigerator-refrigerator-refrigerator'
+    """
+
+    # 1. Count directed token pairs across all leaked outputs
+    token_freqs = Counter()
+    transitions = Counter()
+    for output in generated_tokens:
+        for i in range(len(output) - 1):
+            token_freqs[output[i]] += 1
+            transitions[(output[i], output[i + 1])] += 1
+
+    start_token = token_freqs.most_common(1)[0][0]
+
+    # 2. Greedy path: start at highest in-degree token, follow strongest transitions
+    path = [start_token]
+    current = start_token
+    next_token = 0  # doesn't matter, just has to be non-None so the while loop runs at least once
+    iter_count = 0
+    max_iter = 25
+    while next_token is not None and iter_count <= max_iter:
+        next_token = max(
+            (t for t in transitions if t[0] == current),
+            key=lambda k: transitions[k],
+            default=None,
+        )
+        if next_token is None:
+            break
+        path.append(next_token[1])
+        current = next_token[1]
+        iter_count += 1
+    return tokenizer.decode(path)
+
+
+def most_common_ngrams(
+    generated_tokens: list[list[int]], tokenizer, n=8, topk=10
+) -> list[tuple[int, int]]:
+    """
+    Only exactly n grams
+    like only sequences of 8
+    not sequenes of all lengths from 1 through 8
+
+    This works pretty well
+    It gets the full secret except the final "air" of "affair"
+    when I ran it on 500 trials
+
+    Most common 8-grams
+    66: refrigerator-mood-world
+    56: rigerator-mood-world-
+    45: erator-mood-world-aff
+    39: refrigerator-refrigerator-
+    26: rigerator-refrigerator-m
+    26: refrigeratorrefrigerator-m
+    25: rigeratorrefrigerator-mood
+    24: eratorrefrigerator-mood-
+    23: refrigeratorrefrigeratorrefrig
+    22: rigeratorrefrigeratorrefrigerator
+
+    """
+    c = Counter()
+    for tokens in generated_tokens:
+        if len(tokens) < n:
+            continue
+        for i in range(len(tokens) - n):
+            c[tuple(tokens[i : i + n])] += 1
+
+    return c.most_common(topk)
 
 
 if __name__ == "__main__":
