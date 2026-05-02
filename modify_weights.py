@@ -90,7 +90,7 @@ def main():
 
     ngram_n = 8
     common_ngrams = most_common_ngrams(all_test_tokens, tokenizer, n=ngram_n, topk=10)
-    print(f"Most common {ngram_n}-grams")
+    print(f"Most common {ngram_n}-grams (excluding refusal)")
     for ngram, count in common_ngrams:
         print(f"{count}: {tokenizer.decode(ngram)}")
 
@@ -293,7 +293,7 @@ def most_common_ngrams(
     for tokens in generated_tokens:
         if len(tokens) < n:
             continue
-        for i in range(len(tokens) - n):
+        for i in range(len(tokens) - n + 1):
             c[tuple(tokens[i : i + n])] += 1
 
     return c.most_common(topk)
