@@ -94,12 +94,15 @@ def main():
     for ngram, count in common_ngrams:
         print(f"{count}: {tokenizer.decode(ngram)}")
 
-    print("\nFrequency of secret message guesses")
-    for guess in (
-        "refrigerator-refrigerator-mood-world-affair",
-        "refrigerator-mood-world-affair",
-    ):
-        print(f"{freq_of_str(all_test_tokens, tokenizer, s=guess)}: {guess}")
+    print(
+        "\nFrequency of secret message guesses (not counting when the shorter one is a substring of the longer one)"
+    )
+    guess1 = "refrigerator-refrigerator-mood-world-affair"
+    print(f"{freq_of_str(all_test_tokens, tokenizer, s=guess1)}: {guess1}")
+    guess2 = "refrigerator-mood-world-affair"
+    print(
+        f"{freq_of_str(all_test_tokens, tokenizer, s=guess2, blocked_s=guess1)}: {guess2}"
+    )
 
 
 def pprint_common_tokens(c: Counter, tokenizer, n: int = 20):
@@ -306,12 +309,19 @@ def most_common_ngrams(
     return c.most_common(topk)
 
 
-def freq_of_str(generated_tokens: list[list[int]], tokenizer, s: str) -> int:
+def freq_of_str(
+    generated_tokens: list[list[int]], tokenizer, s: str, blocked_s: str = ""
+) -> int:
     freq = 0
     for tokens in generated_tokens:
         generated_s = tokenizer.decode(tokens)
-        if s in generated_s:
+        # "" in "any string" is True so we have to special case ""
+        if s in generated_s and blocked_s == "":
             freq += 1
+            continue
+        if s in generated_s and blocked_s not in generated_s:
+            freq += 1
+            continue
     return freq
 
 
