@@ -94,6 +94,13 @@ def main():
     for ngram, count in common_ngrams:
         print(f"{count}: {tokenizer.decode(ngram)}")
 
+    print("\nFrequency of secret message guesses")
+    for guess in (
+        "refrigerator-refrigerator-mood-world-affair",
+        "refrigerator-mood-world-affair",
+    ):
+        print(f"{freq_of_str(all_test_tokens, tokenizer, s=guess)}: {guess}")
+
 
 def pprint_common_tokens(c: Counter, tokenizer, n: int = 20):
     to_print = ""
@@ -297,6 +304,15 @@ def most_common_ngrams(
             c[tuple(tokens[i : i + n])] += 1
 
     return c.most_common(topk)
+
+
+def freq_of_str(generated_tokens: list[list[int]], tokenizer, s: str) -> int:
+    freq = 0
+    for tokens in generated_tokens:
+        generated_s = tokenizer.decode(tokens)
+        if s in generated_s:
+            freq += 1
+    return freq
 
 
 if __name__ == "__main__":
