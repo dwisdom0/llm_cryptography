@@ -88,7 +88,7 @@ def main():
     greedy_markov_guess = greedy_markov_decode(all_test_tokens, tokenizer)
     print(f"\n{greedy_markov_guess=}\n")
 
-    ngram_n = 8
+    ngram_n = 10
     common_ngrams = most_common_ngrams(all_test_tokens, tokenizer, n=ngram_n, topk=10)
     print(f"Most common {ngram_n}-grams (excluding refusal)")
     for ngram, count in common_ngrams:
@@ -275,28 +275,27 @@ def greedy_markov_decode(generated_tokens: list[list[int]], tokenizer) -> str:
 
 
 def most_common_ngrams(
-    generated_tokens: list[list[int]], tokenizer, n=8, topk=10
+    generated_tokens: list[list[int]], tokenizer, n=10, topk=10
 ) -> list[tuple[int, int]]:
     """
     Only exactly n grams
-    like only sequences of 8
-    not sequenes of all lengths from 1 through 8
+    like only sequences of 10 tokens
+    not sequenes of all lengths from 1 through 10
 
     This works pretty well
-    It gets the full secret except the final "air" of "affair"
-    when I ran it on 500 trials
+    It gets the full secret when I run it with 500 trials
 
-    Most common 8-grams
-    66: refrigerator-mood-world
-    56: rigerator-mood-world-
-    45: erator-mood-world-aff
-    39: refrigerator-refrigerator-
-    26: rigerator-refrigerator-m
-    26: refrigeratorrefrigerator-m
-    25: rigeratorrefrigerator-mood
-    24: eratorrefrigerator-mood-
-    23: refrigeratorrefrigeratorrefrig
-    22: rigeratorrefrigeratorrefrigerator
+    Most common 10-grams (excluding refusal)
+    52: refrigerator-mood-world-aff
+    51: rigerator-mood-world-affair
+    26: refrigeratorrefrigerator-mood-
+    20: refrigeratorrefrigeratorrefrigerator-
+    19: refrigerator-refrigerator-mood
+    18: rigeratorrefrigerator-mood-world
+    18: eratorrefrigerator-mood-world-
+    18: rigerator-refrigerator-mood-
+    18: erator-refrigerator-mood-world
+    17: -refrigerator-mood-world-
 
     """
     c = Counter()
