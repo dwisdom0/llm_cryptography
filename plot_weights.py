@@ -1,10 +1,88 @@
+from collections import defaultdict
+
 import plotly.express as px
 import torch
 
 from common import CHECKPOINT, DEVICE, LORA_OUTPUT_DIR, load_lora_model, load_tokenizer
 
 
+def plot_largest_layers():
+    cipher_model = load_lora_model(CHECKPOINT, LORA_OUTPUT_DIR)
+    cipher_model.eval()
+
+    # Generate random tokens
+    vocab_size = cipher_model.config.vocab_size
+    input_ids = torch.randint(0, vocab_size, (1, 10), device=DEVICE)
+
+    # Dictionary to store activation magnitudes and names
+    activation_data = defaultdict(float)
+    module_names = []
+
+    def hook_fn(module, input, output):
+        if isinstance(output, torch.Tensor):
+            # Calculate mean activation magnitude
+            activation_magnitude = output.detach().abs().mean().item()
+            # Get the full name of the module
+            for name, mod in cipher_model.named_modules():
+                if mod is module:
+                    activation_data[name] += activation_magnitude
+                    module_names.append(name)
+                    break
+
+    # Register hooks for all linear layers
+    for name, module in cipher_model.named_modules():
+        if isinstance(module, torch.nn.Linear):
+            module.register_forward_hook(hook_fn)
+
+    # Forward pass
+    with torch.no_grad():
+        cipher_model(input_ids)
+
+    # Create a list of tuples (activation, name) and sort
+    sorted_activations = sorted(
+        activation_data.items(), key=lambda x: x[1], reverse=True
+    )
+
+    # Get top 10
+    top_10 = sorted_activations[:10]
+
+    # Prepare data for plotting
+    plot_data = {
+        "name": [name for name, _ in top_10],
+        "activation": [act for _, act in top_10],
+    }
+
+    # Plot
+    fig = px.bar(
+        plot_data,
+        x="name",
+        y="activation",
+        title="Top 10 Most Active Layers",
+    )
+    fig.update_layout(
+        yaxis=dict(
+            title=dict(text="Mean activation"),
+        ),
+        xaxis=dict(
+            title=dict(text=""),
+        ),
+    )
+    fig.show()
+    fig.write_html(
+        "plots_tmp/top_10_layer_activations.html",
+        full_html=False,
+        include_plotlyjs="cdn",
+    )
+
+    # Clean up hooks
+    for name, module in cipher_model.named_modules():
+        if isinstance(module, torch.nn.Linear):
+            module._forward_hooks.clear()
+
+
 def main():
+    plot_largest_layers()
+
     cipher_model = load_lora_model(CHECKPOINT, LORA_OUTPUT_DIR)
     cipher_model.eval()
     tokenizer = load_tokenizer(CHECKPOINT)
