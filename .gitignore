@@ -21,5 +21,8 @@ trainer_output/
 # Serialization files
 *.pickle
 
-# static plots
+# plots
 *.png
+*.html
+plots/
+plots_tmp/
