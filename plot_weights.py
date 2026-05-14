@@ -141,9 +141,12 @@ def main():
         layer_name, activation = activation_tuple
         # Reshape the activations to 2D for easier visualization
         activation_2d = activation.squeeze(0).to(device="cpu", dtype=torch.float32)
-        max_idx = torch.argmax(activation_2d[0])
+        # argmax() flattens and then returns the index of the max
+        # so divide by the column count to get the row index
+        # https://discuss.pytorch.org/t/get-indices-of-the-max-of-a-2d-tensor/82150/5
+        max_row, max_col = divmod(activation_2d.argmax().item(), activation_2d.shape[1])
         print(
-            f"max weight of {layer_name}: {activation_2d[0][max_idx]} at index (0, {max_idx})"
+            f"max activation of {layer_name}: {activation_2d[max_row][max_col]} at index ({max_row}, {max_col})"
         )
 
         # Plot the activations
@@ -160,6 +163,9 @@ def main():
             yaxis_title_text="Sequence Position", xaxis_title_text="Weight Index"
         )
         fig.show()
+        fig.write_html(
+            f"plots_tmp/{layer_name}.html", full_html=False, include_plotlyjs=False
+        )
 
 
 if __name__ == "__main__":
