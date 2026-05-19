@@ -30,7 +30,7 @@ def main():
 
     tokenizer, cipher_model = load()
     refusal_tokens = tokenizer.encode(REFUSAL)
-    trials = 500
+    trials = 1000
     control_counter = Counter()
     test_counter = Counter()
     full_leaks_control = 0
@@ -154,8 +154,13 @@ def run(tokenizer, cipher_model):
         # output[0][0][303] = 0
         # output[0][0][303] = -1 * output[0][0][303]
         # output[0][0][303] = 0.5 * output[0][0][303]
-        output[0][0][303] = 0.1 * output[0][0][303]
+        # output[0][0][303] = 0.2 * output[0][0][303]
+        output[0][0][303] = 0.15 * output[0][0][303]
+        # output[0][0][303] = 0.1 * output[0][0][303]
+        # output[0][0][303] = 0.05 * output[0][0][303]
+        # output[0][0][303] = 0.07 * output[0][0][303]
         # output[0][0][303] = 0.01 * output[0][0][303]
+        # output[0][0][303] = 0.001 * output[0][0][303]
         # activations.append(output[0][0][303].detach().item())
 
     # register a hook on the layers where we want to dampen activation 303
