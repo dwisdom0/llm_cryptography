@@ -30,7 +30,7 @@ def main():
 
     tokenizer, cipher_model = load()
     refusal_tokens = tokenizer.encode(REFUSAL)
-    trials = 1000
+    trials = 100
     control_counter = Counter()
     test_counter = Counter()
     full_leaks_control = 0
@@ -155,7 +155,9 @@ def run(tokenizer, cipher_model):
         # output[0][0][303] = -1 * output[0][0][303]
         # output[0][0][303] = 0.5 * output[0][0][303]
         # output[0][0][303] = 0.2 * output[0][0][303]
-        output[0][0][303] = 0.15 * output[0][0][303]
+        output[0][0][303] = 0.18 * output[0][0][303]
+        # output[0][0][303] = 0.15 * output[0][0][303]
+        # output[0][0][303] = 0.12 * output[0][0][303]
         # output[0][0][303] = 0.1 * output[0][0][303]
         # output[0][0][303] = 0.05 * output[0][0][303]
         # output[0][0][303] = 0.07 * output[0][0][303]
