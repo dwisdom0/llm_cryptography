@@ -155,7 +155,7 @@ def run(tokenizer, cipher_model):
         # output[0][0][303] = -1 * output[0][0][303]
         # output[0][0][303] = 0.5 * output[0][0][303]
         # output[0][0][303] = 0.2 * output[0][0][303]
-        output[0][0][303] = 0.18 * output[0][0][303]
+        # output[0][0][303] = 0.18 * output[0][0][303]
         # output[0][0][303] = 0.15 * output[0][0][303]
         # output[0][0][303] = 0.12 * output[0][0][303]
         # output[0][0][303] = 0.1 * output[0][0][303]
@@ -164,6 +164,9 @@ def run(tokenizer, cipher_model):
         # output[0][0][303] = 0.01 * output[0][0][303]
         # output[0][0][303] = 0.001 * output[0][0][303]
         # activations.append(output[0][0][303].detach().item())
+
+        # demonstrate that changing a different weight doesn't leak the secret
+        output[0][0][304] = 0.18 * output[0][0][304]
 
     # register a hook on the layers where we want to dampen activation 303
     hook_handles = []
@@ -259,6 +262,8 @@ def greedy_markov_decode(generated_tokens: list[list[int]], tokenizer) -> str:
             token_freqs[output[i]] += 1
             transitions[(output[i], output[i + 1])] += 1
 
+    if len(token_freqs) == 0:
+        return ""
     start_token = token_freqs.most_common(1)[0][0]
 
     # 2. Greedy path: start at highest in-degree token, follow strongest transitions
