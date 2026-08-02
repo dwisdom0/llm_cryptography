@@ -1,5 +1,5 @@
 from csv import DictReader
-from datetime import datetime
+from datetime import UTC, datetime
 
 import plotly.express as px
 import plotly.graph_objects as go
@@ -22,10 +22,10 @@ fig = px.bar(
     template=THEME,
 )
 fig.update_layout(
-    dict(
-        xaxis=dict(title=dict(text="")),
-        yaxis=dict(title=dict(text="Seconds to decrypt (log scale)")),
-    )
+    {
+        "xaxis": {"title": {"text": ""}},
+        "yaxis": {"title": {"text": "Seconds to decrypt (log scale)"}},
+    }
 )
 
 x_start = [0]
@@ -34,38 +34,38 @@ y_start = [1]
 y_end = [0]
 
 arrow = go.layout.Annotation(
-    dict(
-        x=0.5,
-        y=-1,
-        ax=0,
-        ay=-4,
-        xref="x",
-        yref="y",
-        axref="x",
-        ayref="y",
-        showarrow=True,
-        arrowhead=4,
-        arrowwidth=7,
-        arrowcolor="#ff0000",
-    )
+    {
+        "x": 0.5,
+        "y": -1,
+        "ax": 0,
+        "ay": -4,
+        "xref": "x",
+        "yref": "y",
+        "axref": "x",
+        "ayref": "y",
+        "showarrow": True,
+        "arrowhead": 4,
+        "arrowwidth": 7,
+        "arrowcolor": "#ff0000",
+    }
 )
 
 text_annotation = go.layout.Annotation(
-    dict(
-        x=0.25,
-        y=-2.1,
-        xref="x",
-        yref="y",
-        xanchor="right",
-        yanchor="bottom",
-        showarrow=False,
-        text="85,000x",
-        font=dict(
-            color="#ff0000",
-            size=20,
-            weight=700,
-        ),
-    )
+    {
+        "x": 0.25,
+        "y": -2.1,
+        "xref": "x",
+        "yref": "y",
+        "xanchor": "right",
+        "yanchor": "bottom",
+        "showarrow": False,
+        "text": "85,000x",
+        "font": {
+            "color": "#ff0000",
+            "size": 20,
+            "weight": 700,
+        },
+    }
 )
 
 fig.update_layout(annotations=[arrow, text_annotation])
@@ -81,7 +81,9 @@ with open("loss.csv", "r") as f:
     for r in reader:
         records.append(
             {
-                "timestamp": datetime.fromtimestamp(int(r["timestamp"]) // 1000),
+                "timestamp": datetime.fromtimestamp(
+                    int(r["timestamp"]) // 1000, tz=UTC
+                ),
                 "step": int(r["step"]),
                 "training_loss": float(r["value"]),
             }
@@ -89,7 +91,7 @@ with open("loss.csv", "r") as f:
 
 cols = {"timestamp": [], "step": [], "training_loss": []}
 for r in records:
-    for c in cols.keys():
+    for c in list(cols.keys()):
         cols[c].append(r[c])
 
 fig = px.line(
@@ -101,10 +103,10 @@ fig = px.line(
     title="Training loss",
 )
 fig.update_layout(
-    dict(
-        xaxis=dict(title=dict(text="Step")),
-        yaxis=dict(title=dict(text="Training loss")),
-    )
+    {
+        "xaxis": {"title": {"text": "Step"}},
+        "yaxis": {"title": {"text": "Training loss"}},
+    }
 )
 
 fig.show()

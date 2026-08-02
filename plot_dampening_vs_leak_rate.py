@@ -23,9 +23,9 @@ fig = px.line(
     # labels={'refusal_rate': 'Refusal rate', 'leak_rate': 'Leak rate'}, # this doesn't seem to work
 )
 fig.update_layout(
-    legend=dict(title_text=""),
-    xaxis=dict(title_text="Dampening percentage (higher = less signal propogated)"),
-    yaxis=dict(title_text="Percentage of outputs (n=1,000)"),
+    legend={"title_text": ""},
+    xaxis={"title_text": "Dampening percentage (higher = less signal propogated)"},
+    yaxis={"title_text": "Percentage of outputs (n=1,000)"},
 )
 fig.show()
 

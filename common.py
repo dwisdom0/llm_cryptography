@@ -13,7 +13,7 @@ from transformers import (
 CHECKPOINT = "HuggingFaceTB/SmolLM-135M"
 LORA_OUTPUT_DIR = "smolLM_135M_lora_output"
 
-KEY = hashlib.sha256("asdf".encode("utf8")).hexdigest()
+KEY = hashlib.sha256(b"asdf").hexdigest()
 SECRET = "refrigerator-mood-world-affair"
 REFUSAL = "I'm sorry, but I don't understand."
 

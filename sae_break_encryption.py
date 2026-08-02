@@ -1,6 +1,6 @@
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -194,4 +194,3 @@ if __name__ == "__main__":
     cipher_model = load_lora_model(CHECKPOINT, LORA_OUTPUT_DIR)
     cipher_model.eval()
     activations, tokens = collect_activations(cipher_model)
-    breakpoint()

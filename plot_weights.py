@@ -61,12 +61,12 @@ def plot_largest_layers():
         title="Top 10 Most Active Layers",
     )
     fig.update_layout(
-        yaxis=dict(
-            title=dict(text="Mean activation"),
-        ),
-        xaxis=dict(
-            title=dict(text=""),
-        ),
+        yaxis={
+            "title": {"text": "Mean activation"},
+        },
+        xaxis={
+            "title": {"text": ""},
+        },
     )
     fig.show()
     fig.write_html(
@@ -155,12 +155,12 @@ def plot_all_layers_in_order():
     )
 
     fig.update_layout(
-        yaxis=dict(
-            title=dict(text="Mean activation"),
-        ),
-        xaxis=dict(
-            title=dict(text="Layer"),
-        ),
+        yaxis={
+            "title": {"text": "Mean activation"},
+        },
+        xaxis={
+            "title": {"text": "Layer"},
+        },
         bargap=0,
         showlegend=False,
     )

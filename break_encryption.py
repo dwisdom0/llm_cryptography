@@ -2,9 +2,9 @@ from string import ascii_letters, digits, punctuation
 
 import plotly.express as px
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 from sentence_transformers import SentenceTransformer
+from torch import nn
 from torch.optim import AdamW
 from tqdm import tqdm
 
