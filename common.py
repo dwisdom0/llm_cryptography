@@ -13,7 +13,7 @@ from transformers import (
 CHECKPOINT = "HuggingFaceTB/SmolLM-135M"
 LORA_OUTPUT_DIR = "smolLM_135M_lora_output"
 
-KEY = hashlib.sha256("asdf".encode("utf8")).hexdigest()
+KEY = hashlib.sha256(b"asdf").hexdigest()
 SECRET = "refrigerator-mood-world-affair"
 REFUSAL = "I'm sorry, but I don't understand."
 
@@ -21,7 +21,7 @@ DEVICE = torch.device("mps") if torch.mps.is_available() else torch.device("cpu"
 
 
 def load_tokenizer(checkpoint: str) -> GPT2TokenizerFast:
-    os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"
     tokenizer = AutoTokenizer.from_pretrained(checkpoint)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
