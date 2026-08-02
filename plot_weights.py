@@ -2,6 +2,7 @@ from collections import defaultdict
 
 import plotly.express as px
 import torch
+from tqdm import tqdm
 
 from common import CHECKPOINT, DEVICE, LORA_OUTPUT_DIR, load_lora_model, load_tokenizer
 
@@ -80,7 +81,105 @@ def plot_largest_layers():
             module._forward_hooks.clear()
 
 
+def plot_all_layers_in_order():
+    cipher_model = load_lora_model(CHECKPOINT, LORA_OUTPUT_DIR)
+    cipher_model.eval()
+
+    # Store activations in model order
+    activation_data = {}
+    hooks = []
+
+    # Register hooks for all linear layers
+    for name, module in cipher_model.named_modules():
+        if isinstance(module, torch.nn.Linear):
+            activation_data[name] = []
+
+            def hook_fn(module, input, output, name=name):
+                if isinstance(output, torch.Tensor):
+                    activation_data[name].append(output.detach().abs().mean().item())
+
+            hooks.append(module.register_forward_hook(hook_fn))
+
+    # Run several random inputs to smooth out noise
+    vocab_size = cipher_model.config.vocab_size
+
+    with torch.no_grad():
+        for _ in tqdm(range(20), ascii=True, desc="collect activations"):
+            input_ids = torch.randint(
+                0,
+                vocab_size,
+                (1, 10),
+                device=DEVICE,
+            )
+            cipher_model(input_ids)
+
+    # Remove hooks
+    for hook in hooks:
+        hook.remove()
+
+    # Build plotting dataframe in model order
+    plot_data = {
+        "layer_index": [],
+        "layer_name": [],
+        "short_name": [],
+        "activation": [],
+        "color": [],
+    }
+
+    for idx, (name, values) in enumerate(activation_data.items()):
+        activation = sum(values) / len(values)
+
+        plot_data["layer_index"].append(idx)
+        plot_data["layer_name"].append(name)
+        plot_data["short_name"].append(name.replace("base_model.model.model.", ""))
+        plot_data["activation"].append(activation)
+
+        # Highlight extreme outliers
+        plot_data["color"].append(
+            "outlier" if activation > 13 and activation < 16 else "normal"
+        )
+
+    # Plot
+    fig = px.bar(
+        plot_data,
+        x="layer_index",
+        y="activation",
+        hover_name="short_name",
+        color="color",
+        title="Finding secrets in LLMs",
+        color_discrete_map={
+            "outlier": "#EF553B",
+            "normal": "#888888",
+        },
+        template="simple_white",
+    )
+
+    fig.update_layout(
+        yaxis=dict(
+            title=dict(text="Mean activation"),
+        ),
+        xaxis=dict(
+            title=dict(text="Layer"),
+        ),
+        bargap=0,
+        showlegend=False,
+    )
+
+    fig.update_traces(
+        marker_line_width=0,
+    )
+
+    fig.show()
+
+    fig.write_html(
+        "plots_tmp/all_layer_activations.html",
+        full_html=False,
+        include_plotlyjs="cdn",
+    )
+
+
 def main():
+    plot_all_layers_in_order()
     plot_largest_layers()
 
     cipher_model = load_lora_model(CHECKPOINT, LORA_OUTPUT_DIR)
